@@ -1,0 +1,270 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCart } from '../context/CartContext';
+import { useAuth } from '../context/AuthContext';
+import Button from '../components/UI/Button';
+import { orderService, CreateOrderRequest } from '../services/orderService';
+import LoadingSpinner from '../components/UI/LoadingSpinner';
+import { AlertCircle } from 'lucide-react';
+import { stockManager } from '../utils/stockManager';
+
+const CashOnDeliveryConfirm: React.FC = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { items, getTotalPrice, clearCart } = useCart();
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const [city, setCity] = useState('Hà Nội');
+  const [zipCode, setZipCode] = useState('10000');
+  const [confirmed, setConfirmed] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Load checkout items from localStorage if they exist
+  const [checkoutItems, setCheckoutItems] = useState(items);
+  
+  useEffect(() => {
+    // Load user info if available
+    if (user) {
+      const savedUser = localStorage.getItem('user');
+      if (savedUser) {
+        try {
+          const userData = JSON.parse(savedUser);
+          setName(userData.name || '');
+        } catch (e) {
+          console.error('Error parsing user data:', e);
+        }
+      }
+    }
+    
+    // Load stored items
+    const storedItems = localStorage.getItem('checkoutItems');
+    if (storedItems) {
+      try {
+        setCheckoutItems(JSON.parse(storedItems));
+      } catch (e) {
+        console.error('Error parsing checkout items:', e);
+      }
+    }
+  }, [user]);
+
+  const handleConfirm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      setIsProcessing(true);
+      setError(null);
+      
+      // Get items either from cart or from localStorage
+      const orderItems = checkoutItems.length > 0 ? checkoutItems : items;
+      
+      if (orderItems.length === 0) {
+        setError("Không có sản phẩm nào trong đơn hàng");
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Kiểm tra tồn kho trước khi đặt hàng
+      try {
+        // Cập nhật thông tin tồn kho mới nhất từ server
+        await Promise.all(orderItems.map(async (item) => {
+          const updatedStock = await stockManager.getStock(item.product.id, true);
+          if (updatedStock >= 0) {
+            item.product.stock = updatedStock;
+          }
+        }));
+        
+        // Kiểm tra xem có đủ hàng không
+        const insufficientItems = orderItems.filter(item => item.quantity > item.product.stock);
+        if (insufficientItems.length > 0) {
+          const itemNames = insufficientItems.map(item => 
+            `${item.product.name} (Còn ${item.product.stock}, cần ${item.quantity})`
+          ).join(', ');
+          throw new Error(`Không đủ hàng tồn kho cho: ${itemNames}`);
+        }
+      } catch (stockError) {
+        console.error("Error checking stock:", stockError);
+        setError(stockError instanceof Error ? stockError.message : "Lỗi kiểm tra tồn kho");
+        setIsProcessing(false);
+        return;
+      }
+      
+      // Kiểm tra tồn kho từ API
+      try {
+        const stockValid = await orderService.checkStockLevels(orderItems);
+        if (!stockValid) {
+          throw new Error("Một số sản phẩm trong đơn hàng đã hết hàng.");
+        }
+      } catch (stockApiError) {
+        console.error("Stock check API error:", stockApiError);
+        // Tiếp tục với dữ liệu tồn kho đã kiểm tra ở phía client
+      }
+      
+      // Create the order request
+      const orderRequest: CreateOrderRequest = {
+        items: orderItems.map(item => ({
+          productId: item.product.id,
+          quantity: item.quantity
+        })),
+        shippingAddress: {
+          firstName: name.split(' ')[0] || 'N/A',
+          lastName: name.split(' ').slice(1).join(' ') || 'N/A',
+          email: user?.email || '',
+          phone,
+          address,
+          city,
+          zipCode
+        },
+        paymentMethod: 'cod'
+      };
+      
+      // Gọi API để đặt hàng và cập nhật tồn kho
+      const response = await orderService.createOrder(orderRequest);
+      
+      if (response) {
+        // Cập nhật số lượng tồn kho ở phía client
+        stockManager.updateLocalStock(orderItems);
+        
+        // Clear cart since order was successful
+        clearCart();
+        
+        // Clear checkout items from localStorage
+        localStorage.removeItem('checkoutItems');
+        localStorage.removeItem('checkoutTotal');
+        
+        setConfirmed(true);
+        
+        // Navigate to order confirmation page
+        setTimeout(() => {
+          navigate('/cash-on-delivery-info', {
+            state: {
+              name,
+              phone,
+              address,
+              items: orderItems,
+              total: response.total || getTotalPrice() * 1.08,
+              orderId: response.id
+            }
+          });
+        }, 1800);
+      }
+    } catch (err) {
+      console.error("Error placing order:", err);
+      setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra khi đặt hàng");
+      setConfirmed(false);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
+  <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-12 text-center border border-blue-100">
+        <h1 className="text-2xl font-bold text-blue-700 mb-4">Xác nhận thông tin nhận hàng</h1>
+          {/* Thông tin đơn hàng rõ ràng */}
+          <div className="mb-6 bg-green-50 rounded-xl p-4 text-left border border-green-100">
+            <div className="font-bold text-green-700 mb-4 text-xl">Thông tin đơn hàng</div>
+            {(checkoutItems.length === 0 && items.length === 0) ? (
+              <div className="text-gray-500">Không có sản phẩm nào trong đơn hàng.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm md:text-base border-collapse">
+                  <thead>
+                    <tr className="bg-green-100 text-green-700">
+                      <th className="py-2 px-2 text-left rounded-tl-xl">Sản phẩm</th>
+                      <th className="py-2 px-2 text-center">Hình ảnh</th>
+                      <th className="py-2 px-2 text-center">Số lượng</th>
+                      <th className="py-2 px-2 text-right rounded-tr-xl">Thành tiền</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(checkoutItems.length > 0 ? checkoutItems : items).map(item => (
+                      <tr key={item.id} className="border-b border-green-100">
+                        <td className="py-2 px-2 font-medium text-gray-800">{item.product.name}</td>
+                        <td className="py-2 px-2 text-center">
+                          <img src={item.product.image} alt={item.product.name} className="w-12 h-12 object-cover rounded-lg mx-auto shadow" />
+                        </td>
+                        <td className="py-2 px-2 text-center text-gray-700">{item.quantity}</td>
+                        <td className="py-2 px-2 text-right text-blue-700 font-semibold">{(item.product.price * item.quantity).toLocaleString()} đ</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-green-100">
+                      <td className="py-2 px-2 font-bold text-green-700 text-right" colSpan={3}>Tổng cộng:</td>
+                      <td className="py-2 px-2 text-right font-bold text-green-700">{
+                        localStorage.getItem('checkoutTotal') ? 
+                        Number(localStorage.getItem('checkoutTotal')).toLocaleString() : 
+                        (getTotalPrice() * 1.08).toLocaleString()
+                      } đ</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </div>
+        <form onSubmit={handleConfirm} className="space-y-5">
+          <div className="text-left">
+            <label className="block font-medium mb-1 text-blue-700">Tên khách hàng</label>
+            <input
+              type="text"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full px-4 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-800"
+              required
+            />
+          </div>
+          <div className="text-left">
+            <label className="block font-medium mb-1 text-blue-700">Số điện thoại</label>
+            <input
+              type="text"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="w-full px-4 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-800"
+              required
+            />
+          </div>
+          <div className="text-left">
+            <label className="block font-medium mb-1 text-blue-700">Địa chỉ nhận hàng</label>
+            <input
+              type="text"
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+              className="w-full px-4 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-800"
+              required
+            />
+          </div>
+          {error && (
+            <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+              <span>{error}</span>
+            </div>
+          )}
+          
+          <Button 
+            type="submit" 
+            className="w-full bg-gradient-to-r from-blue-600 to-green-500 text-white font-bold py-3 rounded-xl shadow-lg hover:from-blue-700 hover:to-green-600 transition-all text-lg"
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <span className="flex items-center justify-center">
+                <LoadingSpinner size="sm" className="mr-2" />
+                Đang xử lý...
+              </span>
+            ) : (
+              "Xác nhận đặt hàng"
+            )}
+          </Button>
+        </form>
+        {confirmed && (
+          <div className="mt-6 text-green-700 font-semibold text-lg animate-pulse">
+            Đặt hàng thành công! Đang chuyển hướng...
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default CashOnDeliveryConfirm;

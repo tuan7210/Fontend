@@ -1,0 +1,155 @@
+{
+  "info": {
+    "name": "Tech Store API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "version": "1.0.0"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5032" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Products",
+      "item": [
+        {
+          "name": "List Products (paged & filters)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/Product?search=iphone&minPrice=10000000&pageNumber=1&pageSize=12&sortBy=price&sortOrder=desc",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product"],
+              "query": [
+                {"key":"search","value":"iphone"},
+                {"key":"minPrice","value":"10000000"},
+                {"key":"pageNumber","value":"1"},
+                {"key":"pageSize","value":"12"},
+                {"key":"sortBy","value":"price"},
+                {"key":"sortOrder","value":"desc"}
+              ]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key":"token","value":"{{token}}","type":"string"}]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 200', () => pm.response.code === 200);",
+                  "const json = pm.response.json();",
+                  "pm.test('Success flag true', () => json && json.success === true);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Product Detail",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/Product/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product", "1"]
+            },
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key":"token","value":"{{token}}","type":"string"}]
+            }
+          }
+        },
+        {
+          "name": "Create Product",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key":"Content-Type","value":"application/json"}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key":"token","value":"{{token}}","type":"string"}]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/Product",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Demo Product\",\n  \"price\": 1999000,\n  \"originalPrice\": 2499000,\n  \"imageUrl\": \"https://example.com/images/demo.jpg\",\n  \"brand\": \"DemoBrand\",\n  \"description\": \"Mô tả ngắn về sản phẩm demo\",\n  \"specifications\": {\n    \"screen\": \"6.1 inch\",\n    \"chip\": \"Demo SoC\"\n  },\n  \"stockQuantity\": 10,\n  \"rating\": 4.5,\n  \"reviewCount\": 0,\n  \"isNew\": true,\n  \"isBestSeller\": false,\n  \"categoryId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Product",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key":"Content-Type","value":"application/json"}
+            ],
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key":"token","value":"{{token}}","type":"string"}]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/Product/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product", "1"]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"iPhone 15 128GB (Updated)\",\n  \"price\": 24500000,\n  \"stockQuantity\": 55,\n  \"isBestSeller\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Delete Product",
+          "request": {
+            "method": "DELETE",
+            "auth": {
+              "type": "bearer",
+              "bearer": [{"key":"token","value":"{{token}}","type":"string"}]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/Product/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Meta",
+      "item": [
+        {
+          "name": "Get Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/Product/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product", "categories"]
+            }
+          }
+        },
+        {
+          "name": "Get Brands",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/Product/brands",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "Product", "brands"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
