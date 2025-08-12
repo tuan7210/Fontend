@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug JWT Token</title>
+</head>
+<body>
+    <h1>Debug JWT Token</h1>
+    <button onclick="debugToken()">Check Token</button>
+    <div id="result"></div>
+
+    <script>
+        function debugToken() {
+            const token = localStorage.getItem('token');
+            const user = localStorage.getItem('user');
+            const resultDiv = document.getElementById('result');
+            
+            let html = '<h2>Debug Results:</h2>';
+            
+            // Check user data
+            html += '<h3>User Data from localStorage:</h3>';
+            if (user) {
+                try {
+                    const userData = JSON.parse(user);
+                    html += '<pre>' + JSON.stringify(userData, null, 2) + '</pre>';
+                } catch (e) {
+                    html += '<p style="color: red;">Error parsing user data: ' + e.message + '</p>';
+                }
+            } else {
+                html += '<p style="color: red;">No user data found in localStorage</p>';
+            }
+            
+            // Check token
+            html += '<h3>JWT Token:</h3>';
+            if (token) {
+                html += '<p>Token exists (length: ' + token.length + ')</p>';
+                
+                try {
+                    // Decode JWT payload
+                    const parts = token.split('.');
+                    if (parts.length === 3) {
+                        const payload = JSON.parse(atob(parts[1]));
+                        html += '<h4>Token Payload:</h4>';
+                        html += '<pre>' + JSON.stringify(payload, null, 2) + '</pre>';
+                        
+                        // Check expiration
+                        if (payload.exp) {
+                            const now = Math.floor(Date.now() / 1000);
+                            const isExpired = payload.exp < now;
+                            html += '<p>Token ' + (isExpired ? '<span style="color: red;">EXPIRED</span>' : '<span style="color: green;">VALID</span>') + '</p>';
+                            html += '<p>Expires: ' + new Date(payload.exp * 1000).toLocaleString() + '</p>';
+                        }
+                    } else {
+                        html += '<p style="color: red;">Invalid token format</p>';
+                    }
+                } catch (e) {
+                    html += '<p style="color: red;">Error decoding token: ' + e.message + '</p>';
+                }
+            } else {
+                html += '<p style="color: red;">No token found in localStorage</p>';
+            }
+            
+            resultDiv.innerHTML = html;
+        }
+    </script>
+</body>
+</html>

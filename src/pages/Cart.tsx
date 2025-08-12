@@ -4,11 +4,10 @@ import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, AlertCircle } from 'lucid
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import Button from '../components/UI/Button';
-import { orderService } from '../services/orderService';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 
 const Cart: React.FC = () => {
-  const { items, removeItem, updateQuantity, getTotalPrice, clearCart } = useCart();
+  const { items, removeItem, updateQuantity, getTotalPrice } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
@@ -32,13 +31,6 @@ const Cart: React.FC = () => {
     try {
       setIsProcessing(true);
       setError(null);
-      
-      // First check if we have enough stock for all items
-      const stockCheck = await orderService.checkStockLevels(items);
-      if (!stockCheck) {
-        setError("Một số sản phẩm trong giỏ hàng của bạn không còn đủ số lượng. Vui lòng kiểm tra lại.");
-        return;
-      }
       
       // Continue with checkout process based on payment method
       if (paymentMethod === 'cod') {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, Smartphone, TrendingUp, Star, X, Laptop, Tablet, Headphones } from 'lucide-react';
+import { ArrowRight, Smartphone, TrendingUp, Star, X, Laptop, Tablet, Headphones, RefreshCw } from 'lucide-react';
 import { Product } from '../types';
 import { productService } from '../services/productService';
 import ProductCard from '../components/Product/ProductCard';
@@ -28,6 +28,8 @@ const Home: React.FC = () => {
   const [isSearchActive, setIsSearchActive] = useState(!!searchFromURL || !!categoryFromURL); // Kích hoạt tìm kiếm nếu có tham số từ URL
   const [sortBy, setSortBy] = useState('popular'); // popular, newest, price-asc, price-desc
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   // Scroll đến kết quả tìm kiếm
   const searchResultsRef = useRef<HTMLDivElement>(null);
@@ -73,6 +75,63 @@ const Home: React.FC = () => {
       }, 500);
     }
   }, [categoryFromURL, isSearchActive]);
+
+  // Thêm function để refresh dữ liệu sản phẩm
+  const refreshProducts = async () => {
+    try {
+      setRefreshing(true);
+      const response = await productService.getProducts({ pageSize: 100 });
+      
+      setProducts(response.items);
+      setError(null);
+      setLastRefresh(new Date());
+      
+      // Hiển thị thông báo thành công ngắn gọn
+      const toast = document.createElement('div');
+      toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all';
+      toast.textContent = 'Dữ liệu đã được cập nhật!';
+      document.body.appendChild(toast);
+      
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => document.body.removeChild(toast), 300);
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Failed to refresh products:', error);
+      setError('Không thể làm mới dữ liệu sản phẩm.');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Tự động refresh dữ liệu mỗi 60 giây khi user đang xem trang (giảm frequency)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      // Chỉ refresh khi user đang active trên trang và đã qua ít nhất 60 giây kể từ lần refresh cuối
+      if (!document.hidden && !refreshing) {
+        const timeSinceLastRefresh = Date.now() - lastRefresh.getTime();
+        if (timeSinceLastRefresh >= 60000) { // 60 giây
+          refreshProducts();
+        }
+      }
+    }, 60000); // 60 giây
+
+    return () => clearInterval(interval);
+  }, [lastRefresh, refreshing]);
+
+  // Refresh dữ liệu khi user quay lại trang (focus) - nhưng chỉ sau 10 giây
+  useEffect(() => {
+    const handleFocus = () => {
+      const timeSinceLastRefresh = Date.now() - lastRefresh.getTime();
+      if (timeSinceLastRefresh >= 10000 && !refreshing) { // 10 giây
+        refreshProducts();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [lastRefresh, refreshing]);
 
   const newProducts = products.filter(p => p.isNew).slice(0, 4);
 
@@ -141,6 +200,7 @@ const Home: React.FC = () => {
       try {
         // Tải lại tất cả sản phẩm
         const response = await productService.getProducts({ pageSize: 100 });
+        
         setProducts(response.items);
       } catch (error) {
         console.error('Failed to fetch all products:', error);
@@ -248,9 +308,27 @@ const Home: React.FC = () => {
               </div>
               <h2 className="text-2xl font-bold text-blue-800">Tìm kiếm thông minh</h2>
             </div>
-            <div className="hidden md:block">
+            <div className="hidden md:flex md:flex-col md:items-end">
               <span className="text-sm text-gray-500">Tìm thấy <strong className="text-blue-600">{filteredProducts.length}</strong> sản phẩm</span>
+              <span className="text-xs text-gray-400">
+                Cập nhật lúc: {lastRefresh.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+              </span>
             </div>
+            <button
+              onClick={refreshProducts}
+              disabled={refreshing}
+              className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                refreshing 
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
+                  : 'bg-white border-blue-200 text-blue-600 hover:bg-blue-50'
+              }`}
+              title="Làm mới dữ liệu sản phẩm"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span className="text-sm font-medium">
+                {refreshing ? 'Đang tải...' : 'Làm mới'}
+              </span>
+            </button>
           </div>
           
           <form

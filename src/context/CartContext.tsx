@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { CartItem, CartContextType, Product } from '../types';
 import { useAuth } from './AuthContext';
-import { stockManager } from '../utils/stockManager';
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
@@ -43,7 +42,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
     
-    // Kiểm tra tồn kho trước khi thêm sản phẩm
+    // Kiểm tra tồn kho đơn giản
     const existingItem = items.find(item => item.product.id === product.id);
     const currentQuantity = existingItem ? existingItem.quantity : 0;
     const newTotalQuantity = currentQuantity + quantity;
@@ -53,16 +52,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       alert(`Chỉ còn ${product.stock} sản phẩm trong kho. Bạn đã có ${currentQuantity} trong giỏ hàng.`);
       return false;
     }
-    
-    // Cập nhật thông tin tồn kho trong cache local
-    stockManager.getStock(product.id).then(updatedStock => {
-      if (updatedStock >= 0 && updatedStock < newTotalQuantity) {
-        alert(`Số lượng hàng tồn kho đã thay đổi. Chỉ còn ${updatedStock} sản phẩm.`);
-        // Nếu cần, có thể cập nhật lại số lượng ở đây
-      }
-    }).catch(() => {
-      // Tiếp tục ngay cả khi không thể kiểm tra tồn kho
-    });
     
     setItems(currentItems => {
       const existingItem = currentItems.find(item => item.product.id === product.id);
@@ -99,32 +88,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       quantity = item.product.stock;
     }
     
-    // Cập nhật thông tin tồn kho từ server
-    stockManager.getStock(productId, true).then(updatedStock => {
-      if (updatedStock >= 0 && updatedStock < quantity) {
-        alert(`Số lượng hàng tồn kho đã thay đổi. Chỉ còn ${updatedStock} sản phẩm.`);
-        
-        // Cập nhật lại số lượng nếu tồn kho đã thay đổi
-        setItems(currentItems =>
-          currentItems.map(item => {
-            if (item.product.id === productId) {
-              return { 
-                ...item, 
-                quantity: Math.min(quantity, updatedStock),
-                product: {
-                  ...item.product,
-                  stock: updatedStock
-                }
-              };
-            }
-            return item;
-          })
-        );
-      }
-    }).catch(() => {
-      // Tiếp tục ngay cả khi không thể kiểm tra tồn kho
-    });
-    
     // Cập nhật số lượng trong giỏ hàng
     setItems(currentItems =>
       currentItems.map(item =>
@@ -136,6 +99,12 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = () => {
     setItems([]);
     localStorage.setItem(getCartKey(), JSON.stringify([]));
+  };
+
+  // Xử lý sau khi đặt hàng thành công
+  const handleOrderSuccess = async (orderItems: CartItem[]) => {
+    // Chỉ xóa giỏ hàng, backend sẽ tự động trừ stock
+    clearCart();
   };
 
   const getItemsCount = () => {
@@ -152,6 +121,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     removeItem,
     updateQuantity,
     clearCart,
+    handleOrderSuccess,
     getItemsCount,
     getTotalPrice,
   };

@@ -42,11 +42,11 @@ const ProductDetail: React.FC = () => {
         const productData = await productService.getProductById(id);
         
         if (productData) {
-          // Lấy thông tin tồn kho mới nhất
-          const updatedStock = await stockManager.getStock(id, true);
+          // Lấy thông tin tồn kho mới nhất từ server
+          const updatedStock = await stockManager.syncWithServer(id);
           
           // Cập nhật số lượng tồn kho nếu có thông tin mới
-          if (updatedStock >= 0) {
+          if (updatedStock !== null) {
             productData.stock = updatedStock;
           }
           
@@ -72,24 +72,38 @@ const ProductDetail: React.FC = () => {
 
     fetchProduct();
     
+    // Subscribe to real-time stock updates
+    const unsubscribe = stockManager.subscribe((productId, newStock) => {
+      if (productId === id) {
+        setProduct(prevProduct => 
+          prevProduct ? { ...prevProduct, stock: newStock } : null
+        );
+      }
+    });
+    
     // Tự động làm mới thông tin tồn kho mỗi 60 giây
-    const refreshInterval = setInterval(() => {
+    const refreshInterval = setInterval(async () => {
       if (id && product) {
         setIsStockUpdating(true);
-        stockManager.getStock(id, true)
-          .then(updatedStock => {
-            if (updatedStock >= 0 && product.stock !== updatedStock) {
-              setProduct(prevProduct => 
-                prevProduct ? { ...prevProduct, stock: updatedStock } : null
-              );
-            }
-          })
-          .catch(console.error)
-          .finally(() => setIsStockUpdating(false));
+        try {
+          const updatedStock = await stockManager.syncWithServer(id);
+          if (updatedStock !== null && product.stock !== updatedStock) {
+            setProduct(prevProduct => 
+              prevProduct ? { ...prevProduct, stock: updatedStock } : null
+            );
+          }
+        } catch (error) {
+          console.error('Error syncing stock:', error);
+        } finally {
+          setIsStockUpdating(false);
+        }
       }
     }, 60000);
     
-    return () => clearInterval(refreshInterval);
+    return () => {
+      unsubscribe();
+      clearInterval(refreshInterval);
+    };
   }, [id, product?.id]);
 
   // ...existing code...

@@ -1,8 +1,7 @@
 import { Order, CartItem } from '../types';
-import { stockManager } from '../utils/stockManager';
 
 // API URL configuration
-const API_URL: string = import.meta.env.VITE_API_URL || 'http://localhost:5032';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5032';
 
 export const mockOrders: Order[] = [
   {
@@ -119,9 +118,38 @@ export const mockOrders: Order[] = [
 async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     const token = localStorage.getItem('token');
+    
+    // Debug: Log token info
+    if (token) {
+      try {
+        const tokenPayload = JSON.parse(atob(token.split('.')[1]));
+        console.log('JWT Token payload:', tokenPayload);
+        
+        // Check if token is expired
+        const now = Math.floor(Date.now() / 1000);
+        if (tokenPayload.exp && tokenPayload.exp < now) {
+          console.warn('Token is expired! Removing token...');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          window.location.href = '/login';
+          throw new Error('Token expired, please login again');
+        } else {
+          console.log('Token is valid, expires at:', new Date(tokenPayload.exp * 1000));
+        }
+      } catch (e) {
+        console.error('Could not decode token:', e);
+        console.log('Removing invalid token...');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    } else {
+      console.log('No token found in localStorage');
+    }
+    
     const headers: HeadersInit = {
       'Accept': 'application/json',
       ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+      // Temporarily disable auth for testing - uncomment next line to enable
       ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options.headers,
     };
@@ -129,16 +157,23 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
     const url = `${API_URL}${path}`;
     console.log(`API Request: ${options.method || 'GET'} ${url}`);
     
+    // Debug: Log request body if present
+    if (options.body) {
+      console.log('Request body:', options.body);
+      console.log('Request headers:', headers);
+    }
+    
     const response = await fetch(url, { ...options, headers });
     
     if (!response.ok) {
       let errorMessage = `API request failed (Status: ${response.status})`;
       try {
         const errorData = await response.json();
-        console.error('API Error:', { 
+        console.error('API Error Details:', { 
           url, 
           method: options.method, 
           status: response.status,
+          requestBody: options.body,
           response: errorData 
         });
         errorMessage = errorData.message || errorData.error || response.statusText;
@@ -147,7 +182,8 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
         console.error('API Error (non-JSON):', { 
           url, 
           method: options.method,
-          status: response.status
+          status: response.status,
+          requestBody: options.body
         });
         try {
           const text = await response.text();
@@ -175,20 +211,13 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export interface CreateOrderRequest {
+  // userId được backend tự động lấy từ JWT token
   items: Array<{
-    productId: string;
+    productId: number;
     quantity: number;
   }>;
-  shippingAddress: {
-    firstName: string;
-    lastName: string;
-    email: string;
-    phone: string;
-    address: string;
-    city: string;
-    zipCode: string;
-  };
-  paymentMethod: 'cod' | 'online';
+  shippingAddress: string;
+  paymentMethod: string;
 }
 
 export interface OrderResponse {
@@ -196,7 +225,7 @@ export interface OrderResponse {
   status: Order['status'];
   total: number;
   items: Array<{
-    productId: string;
+    productId: number;
     quantity: number;
     price: number;
     subtotal: number;
@@ -235,7 +264,7 @@ const getSavedOrders = (): Order[] => {
 export const orderService = {
   async getOrders() {
     try {
-      const response = await http<Order[]>('/api/Order');
+      const response = await http<Order[]>('/api/OrderTable');
       // Cập nhật localStorage nếu API thành công
       saveOrdersToStorage(response);
       return response;
@@ -246,14 +275,28 @@ export const orderService = {
     }
   },
 
-  async getOrderById(id: string) {
+  async getOrderById(id: string): Promise<Order | null> {
+    console.log(`Looking for order with ID: ${id}`);
+    
     try {
-      return await http<Order>(`/api/Order/${id}`);
+      return await http<Order>(`/api/OrderTable/${id}`);
     } catch (error) {
-      console.error(`Failed to fetch order ${id}:`, error);
-      // Fallback to localStorage or mock data
+      console.error(`Failed to fetch order ${id} from API:`, error);
+      
+      // Fallback to localStorage
       const savedOrders = getSavedOrders();
-      return savedOrders.find(o => o.id === id) || null;
+      console.log(`Found ${savedOrders.length} orders in localStorage`);
+      console.log('Available order IDs:', savedOrders.map(o => o.id));
+      
+      const foundOrder = savedOrders.find(o => o.id === id);
+      
+      if (!foundOrder) {
+        console.warn(`Order with ID ${id} not found in local storage either`);
+        return null;
+      }
+      
+      console.log(`Found order ${id} in local storage`);
+      return foundOrder;
     }
   },
 
@@ -274,7 +317,7 @@ export const orderService = {
       }
       
       // Gọi API với ID người dùng cụ thể
-      return await http<Order[]>(`/api/Order/customer/${userIdToUse}`);
+      return await http<Order[]>(`/api/OrderTable/customer/${userIdToUse}`);
     } catch (error) {
       console.error(`Failed to fetch user orders:`, error);
       // Fallback to localStorage or mock data
@@ -292,32 +335,59 @@ export const orderService = {
     const cartItems: CartItem[] = JSON.parse(localStorage.getItem('checkoutItems') || '[]');
     
     try {
+      // Tạo payload không có userId (backend sẽ tự lấy từ JWT token)
+      const payload = {
+        shippingAddress: orderData.shippingAddress,
+        paymentMethod: orderData.paymentMethod || 'cash_on_delivery',
+        items: orderData.items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity
+        }))
+      };
+      
+      console.log('Sending order payload:', payload);
+      
       // Real API call to create order and update stock
       const response = await http<OrderResponse>('/api/Order', {
         method: 'POST',
-        body: JSON.stringify(orderData),
+        body: JSON.stringify(payload),
       });
+      
+      console.log('Order created successfully:', response);
       
       // Đơn hàng thành công - cập nhật số lượng tồn kho ở phía client
       if (response && response.id) {
-        // Cập nhật số lượng hàng tồn kho ở local
-        stockManager.updateLocalStock(cartItems);
+        // Lấy userId từ localStorage để lưu đơn hàng
+        let userId = '1'; // fallback
+        const userData = localStorage.getItem('user');
+        if (userData) {
+          try {
+            const user = JSON.parse(userData);
+            userId = user.userId?.toString() || user.email || '1';
+          } catch (e) {
+            console.warn('Could not parse user data');
+          }
+        }
         
-        // Bắt đầu làm mới dữ liệu sản phẩm từ server để đồng bộ hóa
-        setTimeout(() => {
-          stockManager.refreshAllProducts().catch(err => 
-            console.error('Error refreshing stock data:', err)
-          );
-        }, 1000);
+        // Tạo shippingAddress object từ string để lưu vào localStorage
+        const shippingAddressObj = {
+          firstName: 'N/A',
+          lastName: 'N/A', 
+          email: cartItems.length > 0 ? cartItems[0].product.brand : '',
+          phone: 'N/A',
+          address: orderData.shippingAddress,
+          city: 'N/A',
+          zipCode: 'N/A'
+        };
         
         // Lưu đơn hàng mới vào localStorage
         this.saveNewOrder({
           id: response.id,
-          userId: orderData.shippingAddress.email,
+          userId: userId,
           items: cartItems,
           total: response.total || cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
           status: 'pending',
-          shippingAddress: orderData.shippingAddress,
+          shippingAddress: shippingAddressObj,
           createdAt: response.createdAt || new Date().toISOString(),
           updatedAt: response.createdAt || new Date().toISOString()
         });
@@ -332,14 +402,37 @@ export const orderService = {
       const total = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
       const createdAt = new Date().toISOString();
       
+      // Lấy userId từ localStorage
+      let userId = '1'; // fallback
+      const userData = localStorage.getItem('user');
+      if (userData) {
+        try {
+          const user = JSON.parse(userData);
+          userId = user.userId?.toString() || user.email || '1';
+        } catch (e) {
+          console.warn('Could not parse user data');
+        }
+      }
+      
+      // Tạo shippingAddress object từ string để lưu vào localStorage
+      const shippingAddressObj = {
+        firstName: 'N/A',
+        lastName: 'N/A', 
+        email: cartItems.length > 0 ? cartItems[0].product.brand : '',
+        phone: 'N/A',
+        address: orderData.shippingAddress,
+        city: 'N/A',
+        zipCode: 'N/A'
+      };
+      
       // Tạo đơn hàng cho local storage
       const newOrder: Order = {
         id: mockOrderId,
-        userId: orderData.shippingAddress.email,
+        userId: userId,
         items: cartItems,
         total: total,
         status: 'pending',
-        shippingAddress: orderData.shippingAddress,
+        shippingAddress: shippingAddressObj,
         createdAt: createdAt,
         updatedAt: createdAt
       };
@@ -353,7 +446,7 @@ export const orderService = {
         status: 'pending',
         total: total,
         items: orderData.items.map(item => {
-          const matchingItem = cartItems.find(i => i.product.id === item.productId);
+          const matchingItem = cartItems.find(i => parseInt(i.product.id) === item.productId);
           const price = matchingItem ? matchingItem.product.price : 0;
           return {
             productId: item.productId,
@@ -366,9 +459,6 @@ export const orderService = {
         message: 'Đơn hàng được tạo trong chế độ ngoại tuyến. Bạn có thể theo dõi trạng thái đơn hàng trong mục quản lý đơn hàng.'
       };
       
-      // Ngay cả trong trường hợp thất bại, chúng ta vẫn cập nhật số lượng hàng tồn kho ở phía client
-      stockManager.updateLocalStock(cartItems);
-      
       console.warn('Using mock order due to API failure');
       return mockOrderResponse;
     }
@@ -376,14 +466,17 @@ export const orderService = {
   
   // Phương thức bổ sung để lưu đơn hàng mới vào localStorage
   saveNewOrder(order: Order) {
+    console.log('Saving new order:', order.id);
     const savedOrders = getSavedOrders();
+    console.log('Current saved orders count:', savedOrders.length);
     savedOrders.unshift(order); // Thêm đơn hàng mới vào đầu danh sách
     saveOrdersToStorage(savedOrders);
+    console.log('Order saved. New total count:', savedOrders.length);
   },
 
   async updateOrderStatus(id: string, status: Order['status']) {
     try {
-      const response = await http<Order>(`/api/Order/${id}/status`, {
+      const response = await http<Order>(`/api/OrderTable/${id}/status`, {
         method: 'PATCH',
         body: JSON.stringify({ status }),
       });
@@ -413,55 +506,6 @@ export const orderService = {
         return savedOrders[orderIndex];
       }
       return null;
-    }
-  },
-  
-  // Function to check stock levels before checkout
-  async checkStockLevels(items: CartItem[]): Promise<boolean> {
-    try {
-      // Làm mới số lượng tồn kho trước khi kiểm tra (có thể có thay đổi từ đơn hàng khác)
-      await Promise.all(items.map(async (item) => {
-        const updatedStock = await stockManager.getStock(item.product.id, true);
-        if (updatedStock >= 0) {
-          item.product.stock = updatedStock;
-        }
-      }));
-      
-      // Đường dẫn API phù hợp với backend của bạn
-      const response = await http<{valid: boolean, message?: string}>('/api/Product/check-stock', {
-        method: 'POST',
-        body: JSON.stringify({ 
-          items: items.map(item => ({
-            productId: item.product.id,
-            quantity: item.quantity
-          }))
-        }),
-      });
-      
-      // Cập nhật thông tin hàng tồn kho vào cache local
-      if (!response.valid && response.message) {
-        throw new Error(response.message);
-      }
-      
-      return response.valid;
-    } catch (error) {
-      console.error('Failed to check stock levels:', error);
-      
-      // Fallback: Kiểm tra tồn kho dựa trên dữ liệu phía client
-      const insufficientItems: string[] = [];
-      
-      items.forEach(item => {
-        if (item.quantity > item.product.stock) {
-          insufficientItems.push(`${item.product.name} (còn ${item.product.stock}, cần ${item.quantity})`);
-        }
-      });
-      
-      if (insufficientItems.length > 0) {
-        throw new Error(`Không đủ hàng tồn kho cho: ${insufficientItems.join(', ')}`);
-      }
-      
-      // Nếu không có sản phẩm nào vượt quá tồn kho, cho phép tiếp tục
-      return true;
     }
   }
 };

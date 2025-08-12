@@ -2,129 +2,195 @@ import { productService } from '../services/productService';
 import { CartItem } from '../types';
 
 /**
- * Hàm tiện ích để cập nhật lại số lượng hàng tồn kho ở phía client
- * sau khi đặt hàng thành công
+ * Stock Manager - Quản lý đồng bộ tồn kho real-time giữa các trang
  */
 export const stockManager = {
-  // Lưu cache các sản phẩm đã được cập nhật
+  // Cache sản phẩm đã được cập nhật
   updatedProducts: new Map<string, number>(),
   
+  // Danh sách subscribers để thông báo khi stock thay đổi
+  subscribers: new Set<(productId: string, newStock: number) => void>(),
+  
+  // Thời gian cập nhật cuối cùng cho mỗi sản phẩm
+  lastUpdate: new Map<string, number>(),
+
   /**
-   * Cập nhật số lượng hàng tồn kho trong bộ nhớ cache local
-   * @param items Các mặt hàng đã đặt
+   * Đăng ký listener để nhận thông báo khi stock thay đổi
    */
-  updateLocalStock(items: CartItem[]) {
-    const updatePromises: Promise<void>[] = [];
-    
-    items.forEach(item => {
-      const productId = item.product.id;
-      const currentStock = item.product.stock;
-      const quantity = item.quantity;
-      
-      // Cập nhật số lượng tồn kho
-      const newStock = Math.max(0, currentStock - quantity);
-      this.updatedProducts.set(productId, newStock);
-      
-      // Cập nhật số lượng tồn kho trong LocalStorage nếu cần
+  subscribe(callback: (productId: string, newStock: number) => void): () => void {
+    this.subscribers.add(callback);
+    return () => {
+      this.subscribers.delete(callback);
+    };
+  },
+
+  /**
+   * Thông báo cho tất cả subscribers khi stock thay đổi
+   */
+  notifySubscribers(productId: string, newStock: number): void {
+    this.subscribers.forEach(callback => {
       try {
-        // Cập nhật sản phẩm trong localStorage nếu có
-        const cartItems = localStorage.getItem('cart-items');
-        if (cartItems) {
-          const items = JSON.parse(cartItems);
-          const updatedItems = items.map((cartItem: any) => {
-            if (cartItem.product?.id === productId) {
-              return {
-                ...cartItem,
-                product: {
-                  ...cartItem.product,
-                  stock: newStock
-                }
-              };
-            }
-            return cartItem;
-          });
-          localStorage.setItem('cart-items', JSON.stringify(updatedItems));
-        }
-        
-        // Thêm vào danh sách promise để cập nhật stock trong API
-        updatePromises.push(
-          (async () => {
-            try {
-              const product = await productService.getProductById(productId);
-              if (product && product.stock !== newStock) {
-                // Cập nhật số lượng tồn kho trong API
-                await productService.updateProduct(productId, { stock: newStock });
-                console.log(`Đã cập nhật tồn kho cho sản phẩm ${productId}: ${newStock}`);
-              }
-            } catch (error) {
-              console.error(`Không thể cập nhật tồn kho cho sản phẩm ${productId}:`, error);
-            }
-          })()
-        );
+        callback(productId, newStock);
       } catch (error) {
-        console.error('Error updating cart items in localStorage:', error);
+        console.error('Error in stock subscriber:', error);
       }
     });
-    
-    // Thực thi tất cả các promise cập nhật
-    Promise.all(updatePromises).catch(error => {
-      console.error('Error while updating stock in API:', error);
-    });
   },
-  
+
   /**
-   * Đồng bộ hóa số lượng tồn kho với server
-   * @param productId ID của sản phẩm cần làm mới
-   * @returns Số lượng tồn kho mới
+   * Lấy stock đã được cache cho một sản phẩm
    */
-  async refreshProductStock(productId: string): Promise<number> {
+  getCachedStock(productId: string): number | null {
+    return this.updatedProducts.get(productId) || null;
+  },
+
+  /**
+   * Cập nhật stock và thông báo cho subscribers
+   */
+  updateStockAndNotify(productId: string, newStock: number): void {
+    const oldStock = this.updatedProducts.get(productId);
+    
+    this.updatedProducts.set(productId, newStock);
+    this.lastUpdate.set(productId, Date.now());
+
+    // Chỉ notify nếu stock thực sự thay đổi
+    if (oldStock !== newStock) {
+      this.notifySubscribers(productId, newStock);
+    }
+  },
+
+  /**
+   * Đồng bộ stock với server và thông báo
+   */
+  async syncWithServer(productId: string): Promise<number | null> {
     try {
       const product = await productService.getProductById(productId);
       if (product) {
-        this.updatedProducts.set(productId, product.stock);
-        return product.stock;
+        const currentStock = product.stock;
+        this.updateStockAndNotify(productId, currentStock);
+        return currentStock;
       }
-      return -1;
     } catch (error) {
-      console.error(`Failed to refresh stock for product ${productId}:`, error);
-      return -1;
+      console.error('Error syncing with server:', error);
     }
+    return null;
   },
-  
+
   /**
-   * Lấy số lượng tồn kho hiện tại của sản phẩm
-   * Ưu tiên dữ liệu từ cache local, sau đó mới gọi API nếu cần
-   * @param productId ID của sản phẩm
-   * @param forceRefresh Có bắt buộc làm mới từ server không
+   * Giảm stock sau khi đặt hàng thành công
    */
-  async getStock(productId: string, forceRefresh = false): Promise<number> {
-    if (forceRefresh || !this.updatedProducts.has(productId)) {
-      return this.refreshProductStock(productId);
-    }
-    return this.updatedProducts.get(productId) ?? -1;
-  },
-  
-  /**
-   * Làm mới toàn bộ dữ liệu sản phẩm sau khi đặt hàng
-   */
-  async refreshAllProducts(): Promise<void> {
-    try {
-      // Lấy danh sách sản phẩm cần làm mới
-      const productIds = Array.from(this.updatedProducts.keys());
+  async decrementStockAfterOrder(cartItems: CartItem[]): Promise<void> {
+    for (const item of cartItems) {
+      const productId = item.product.id;
+      let currentStock = this.getCachedStock(productId);
       
-      // Làm mới từng sản phẩm một
-      for (const productId of productIds) {
-        await this.refreshProductStock(productId);
+      // Nếu không có cache, sử dụng stock từ product
+      if (currentStock === null) {
+        currentStock = item.product.stock;
       }
+      
+      const newStock = Math.max(0, currentStock - item.quantity);
+      
+      // Cập nhật local stock và notify ngay lập tức
+      this.updateStockAndNotify(productId, newStock);
+      
+      // Lưu vào localStorage để persist data
+      try {
+        const localUpdates = JSON.parse(localStorage.getItem('stockUpdates') || '{}');
+        localUpdates[productId] = {
+          stock: newStock,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
+      } catch (error) {
+        console.error('Error saving to localStorage:', error);
+      }
+      
+      // Cập nhật product stock trong memory để các component khác có thể sử dụng
+      item.product.stock = newStock;
+    }
+    
+    // Đồng bộ với server sau khi cập nhật tất cả local stocks
+    setTimeout(async () => {
+      for (const item of cartItems) {
+        try {
+          await this.syncWithServer(item.product.id);
+        } catch (error) {
+          console.error(`Error syncing ${item.product.id} with server:`, error);
+        }
+      }
+    }, 500);
+  },
+
+  /**
+   * Khôi phục stock từ localStorage khi khởi động
+   */
+  restoreFromLocalStorage(): void {
+    try {
+      const localUpdates = JSON.parse(localStorage.getItem('stockUpdates') || '{}');
+      const now = Date.now();
+      
+      Object.entries(localUpdates).forEach(([productId, data]: [string, any]) => {
+        // Chỉ khôi phục nếu dữ liệu không quá cũ (dưới 1 giờ)
+        if (data.timestamp && (now - data.timestamp) < 3600000) {
+          this.updatedProducts.set(productId, data.stock);
+          this.lastUpdate.set(productId, data.timestamp);
+        }
+      });
     } catch (error) {
-      console.error('Failed to refresh all products:', error);
+      console.error('Error restoring from localStorage:', error);
     }
   },
-  
+
   /**
-   * Xóa tất cả dữ liệu cache
+   * Xóa cache cũ
+   */
+  cleanOldCache(): void {
+    const now = Date.now();
+    const maxAge = 3600000; // 1 giờ
+    
+    for (const [productId, timestamp] of this.lastUpdate.entries()) {
+      if (now - timestamp > maxAge) {
+        this.updatedProducts.delete(productId);
+        this.lastUpdate.delete(productId);
+      }
+    }
+  },
+
+  /**
+   * Xóa cache
    */
   clearCache(): void {
     this.updatedProducts.clear();
+    this.lastUpdate.clear();
+    localStorage.removeItem('stockUpdates');
+  },
+
+  /**
+   * Khởi tạo stock manager
+   */
+  init(): void {
+    this.restoreFromLocalStorage();
+    this.cleanOldCache();
+    
+    // Dọn dẹp cache mỗi 5 phút
+    setInterval(() => {
+      this.cleanOldCache();
+    }, 300000);
+  },
+
+  /**
+   * Debug function - kiểm tra trạng thái hiện tại
+   */
+  debug(): void {
+    console.log('=== StockManager Debug ===');
+    console.log('Subscribers count:', this.subscribers.size);
+    console.log('Updated products:', Array.from(this.updatedProducts.entries()));
+    console.log('Last updates:', Array.from(this.lastUpdate.entries()));
+    console.log('localStorage stockUpdates:', localStorage.getItem('stockUpdates'));
+    console.log('=========================');
   }
 };
+
+// Khởi tạo khi module được load
+stockManager.init();

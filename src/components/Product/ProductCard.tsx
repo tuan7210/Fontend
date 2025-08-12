@@ -4,7 +4,6 @@ import { Star, ShoppingCart } from 'lucide-react';
 import { Product } from '../../types';
 import { useCart } from '../../context/CartContext';
 import Button from '../UI/Button';
-import { stockManager } from '../../utils/stockManager';
 
 interface ProductCardProps {
   product: Product;
@@ -14,36 +13,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct }) =>
   const { addItem } = useCart();
   const navigate = useNavigate();
   const [product, setProduct] = useState(initialProduct);
-  const [isStockUpdating, setIsStockUpdating] = useState(false);
   
-  // Đồng bộ hóa thông tin hàng tồn kho khi hiển thị sản phẩm
+  // Update product when initialProduct changes
   useEffect(() => {
-    const checkStock = async () => {
-      setIsStockUpdating(true);
-      try {
-        // Lấy số lượng tồn kho mới nhất từ stockManager
-        const updatedStock = await stockManager.getStock(initialProduct.id);
-        if (updatedStock >= 0 && updatedStock !== initialProduct.stock) {
-          // Cập nhật lại số lượng tồn kho nếu khác
-          setProduct({
-            ...initialProduct,
-            stock: updatedStock
-          });
-        }
-      } catch (error) {
-        console.error("Error checking stock:", error);
-      } finally {
-        setIsStockUpdating(false);
-      }
-    };
-    
-    // Chỉ đồng bộ hóa khi initialProduct thay đổi
-    checkStock();
-  }, [initialProduct.id]);
+    setProduct(initialProduct);
+  }, [initialProduct]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Sử dụng sản phẩm đã được cập nhật số lượng tồn kho
+    // Sử dụng sản phẩm từ props
     const result = addItem(product);
     if (result === false) {
       navigate('/login');
@@ -104,19 +82,18 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct }) =>
               <span className="text-sm text-gray-500 line-through">{product.originalPrice.toLocaleString()} đ</span>
             )}
           </div>
-          <span className={`text-sm ${isStockUpdating ? 'text-blue-500' : product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
-            {isStockUpdating ? 'Đang cập nhật...' : 
-             product.stock > 0 ? `${product.stock} trong kho` : 'Hết hàng'}
+          <span className={`text-sm ${product.stock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+            {product.stock > 0 ? `${product.stock} trong kho` : 'Hết hàng'}
           </span>
         </div>
         
         <Button
           onClick={handleAddToCart}
           className="w-full"
-          disabled={product.stock === 0 || isStockUpdating}
+          disabled={product.stock === 0}
         >
           <ShoppingCart className="w-4 h-4 mr-2" />
-          {isStockUpdating ? 'Đang cập nhật...' : product.stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng'}
+          {product.stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng'}
         </Button>
       </div>
     </div>

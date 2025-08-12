@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import { CheckCircle, Home, Phone, User, Package } from 'lucide-react';
 import Button from '../components/UI/Button';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { useCart } from '../context/CartContext';
 
 const CashOnDeliveryInfo: React.FC = () => {
   const location = useLocation();

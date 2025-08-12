@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Package, Plus, Edit, Trash2, Search, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
-  // Lưu ý: Chúng ta đã thay thế hàm này bằng cách sử dụng Promise trong handleSaveProductort { productService } from '../../services/productService';
+import { productService } from '../../services/productService';
+import { stockManager } from '../../utils/stockManager';
 import Button from '../../components/UI/Button';
-import LoadingSpinner from '../../components/UI/LoadingSpinner';
 
 import { Product } from '../../types';
 
@@ -58,6 +58,9 @@ const AdminProducts: React.FC = () => {
   useEffect(() => {
     const loadMasterData = async () => {
       try {
+        // Initialize stockManager to load cached data
+        stockManager.init();
+        
         const [categoriesResponse, brandsResponse] = await Promise.all([
           productService.getCategories(),
           productService.getBrands()
@@ -93,7 +96,15 @@ const AdminProducts: React.FC = () => {
         sortOrder: sortOrder
       });
       
-      setProducts(response.items);
+      // Apply cached stock from stockManager
+      const productsWithCachedStock = response.items.map(product => {
+        const cachedStock = stockManager.getCachedStock(product.id);
+        return cachedStock !== null 
+          ? { ...product, stock: cachedStock }
+          : product;
+      });
+      
+      setProducts(productsWithCachedStock);
       setTotalCount(response.totalCount);
       
       // Tính toán số trang
@@ -123,6 +134,35 @@ const AdminProducts: React.FC = () => {
       clearTimeout(handler);
     };
   }, [search, categoryId, brand, minPrice, maxPrice, inStock]);
+
+  // Subscribe to stock changes from customer orders
+  useEffect(() => {
+    const unsubscribe = stockManager.subscribe((productId, newStock) => {
+      setProducts(prevProducts => 
+        prevProducts.map(product => 
+          product.id === productId 
+            ? { ...product, stock: newStock }
+            : product
+        )
+      );
+    });
+
+    return unsubscribe;
+  }, []);
+
+  // Apply cached stock when products change
+  useEffect(() => {
+    if (products.length > 0) {
+      setProducts(prevProducts => 
+        prevProducts.map(product => {
+          const cachedStock = stockManager.getCachedStock(product.id);
+          return cachedStock !== null 
+            ? { ...product, stock: cachedStock }
+            : product;
+        })
+      );
+    }
+  }, []);
 
   // Xử lý khi chọn file ảnh
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -325,6 +365,21 @@ const AdminProducts: React.FC = () => {
           isBestSeller: updatedProduct.isBestSeller
         });
         
+        // Notify stockManager về stock update
+        stockManager.updateStockAndNotify(String(updatedProduct.productId), Number(updatedProduct.stockQuantity));
+        
+        // Lưu vào localStorage để persist data
+        try {
+          const localUpdates = JSON.parse(localStorage.getItem('stockUpdates') || '{}');
+          localUpdates[String(updatedProduct.productId)] = {
+            stock: Number(updatedProduct.stockQuantity),
+            timestamp: Date.now()
+          };
+          localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
+        } catch (error) {
+          console.error('Error saving admin update:', error);
+        }
+        
         setSuccessMsg('Cập nhật sản phẩm thành công!');
       }
       
@@ -371,6 +426,59 @@ const AdminProducts: React.FC = () => {
     }
   };
 
+  // Xử lý cập nhật kho hàng nhanh
+  const handleQuickStockUpdate = async (productId: string, currentStock: number) => {
+    const newStock = prompt(`Cập nhật tồn kho cho sản phẩm (hiện tại: ${currentStock}):`, currentStock.toString());
+    
+    if (newStock === null || newStock === currentStock.toString()) return;
+    
+    const stockNumber = parseInt(newStock);
+    if (isNaN(stockNumber) || stockNumber < 0) {
+      setErrorMsg('Số lượng tồn kho phải là số nguyên dương.');
+      return;
+    }
+
+    setLoading(true);
+    setErrorMsg('');
+    
+    try {
+      await productService.updateProduct(productId, {
+        stock: stockNumber
+      });
+      
+      // Notify stockManager về stock update
+      stockManager.updateStockAndNotify(productId, stockNumber);
+      
+      // Lưu vào localStorage để persist data
+      try {
+        const localUpdates = JSON.parse(localStorage.getItem('stockUpdates') || '{}');
+        localUpdates[productId] = {
+          stock: stockNumber,
+          timestamp: Date.now()
+        };
+        localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
+      } catch (error) {
+        console.error('Error saving admin update:', error);
+      }
+      
+      setSuccessMsg(`Cập nhật tồn kho thành công! (${currentStock} → ${stockNumber})`);
+      
+      // Reload sản phẩm sau khi cập nhật
+      await loadProducts();
+      
+      // Tự động ẩn thông báo sau 3 giây
+      setTimeout(() => {
+        setSuccessMsg('');
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Failed to update stock:', error);
+      setErrorMsg('Không thể cập nhật tồn kho. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Reset filter
   const resetFilters = () => {
     setSearch('');
@@ -394,6 +502,14 @@ const AdminProducts: React.FC = () => {
         </h1>
         <div className="flex gap-3">
           <Button
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            onClick={loadProducts}
+            disabled={loading}
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? 'Đang tải...' : 'Làm mới'}
+          </Button>
+          <Button
             className="bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2"
             onClick={handleOpenCreateModal}
           >
@@ -402,7 +518,70 @@ const AdminProducts: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Thống kê tổng quan */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow-sm p-4 border border-blue-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Tổng sản phẩm</p>
+              <p className="text-2xl font-bold text-blue-600">{totalCount}</p>
+            </div>
+            <Package className="w-8 h-8 text-blue-500" />
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4 border border-green-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Còn hàng</p>
+              <p className="text-2xl font-bold text-green-600">
+                {products.filter(p => p.stock > 10).length}
+              </p>
+            </div>
+            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+              <div className="w-4 h-4 bg-green-500 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4 border border-yellow-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Sắp hết</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {products.filter(p => p.stock > 0 && p.stock <= 10).length}
+              </p>
+            </div>
+            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center">
+              <div className="w-4 h-4 bg-yellow-500 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow-sm p-4 border border-red-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Hết hàng</p>
+              <p className="text-2xl font-bold text-red-600">
+                {products.filter(p => p.stock === 0).length}
+              </p>
+            </div>
+            <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
+              <div className="w-4 h-4 bg-red-500 rounded-full"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       {/* Thông báo */}
+      {products.filter(p => p.stock <= 10 && p.stock > 0).length > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200 text-yellow-800">
+          <strong>Cảnh báo:</strong> Có {products.filter(p => p.stock <= 10 && p.stock > 0).length} sản phẩm sắp hết hàng (≤ 10 sản phẩm).
+        </div>
+      )}
+      {products.filter(p => p.stock === 0).length > 0 && (
+        <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-800">
+          <strong>Hết hàng:</strong> Có {products.filter(p => p.stock === 0).length} sản phẩm đã hết hàng.
+        </div>
+      )}
       {errorMsg && (
         <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-red-700">
           {errorMsg}
@@ -581,13 +760,26 @@ const AdminProducts: React.FC = () => {
                       )}
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <div className="font-medium">{product.stock}</div>
-                      <div className="text-xs">
-                        {product.stock > 0 ? (
-                          <span className="text-green-600">Còn hàng</span>
-                        ) : (
-                          <span className="text-red-600">Hết hàng</span>
-                        )}
+                      <div className="flex items-center justify-center gap-2">
+                        <div>
+                          <div className="font-medium">{product.stock}</div>
+                          <div className="text-xs">
+                            {product.stock > 10 ? (
+                              <span className="text-green-600">Còn hàng</span>
+                            ) : product.stock > 0 ? (
+                              <span className="text-yellow-600">Sắp hết</span>
+                            ) : (
+                              <span className="text-red-600">Hết hàng</span>
+                            )}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleQuickStockUpdate(product.id, product.stock)}
+                          className="p-1 rounded-md text-blue-600 hover:bg-blue-50"
+                          title="Cập nhật tồn kho"
+                        >
+                          <RefreshCw className="w-3 h-3" />
+                        </button>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-center">

@@ -6,17 +6,16 @@ import Button from '../components/UI/Button';
 import { orderService, CreateOrderRequest } from '../services/orderService';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import { AlertCircle } from 'lucide-react';
-import { stockManager } from '../utils/stockManager';
 
 const CashOnDeliveryConfirm: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { items, getTotalPrice, clearCart } = useCart();
+  const { items, getTotalPrice, handleOrderSuccess } = useCart();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Hà Nội');
-  const [zipCode, setZipCode] = useState('10000');
+  const [city] = useState('Hà Nội');
+  const [zipCode] = useState('10000');
   const [confirmed, setConfirmed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +55,22 @@ const CashOnDeliveryConfirm: React.FC = () => {
       setIsProcessing(true);
       setError(null);
       
+      // Check authentication first
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError("Vui lòng đăng nhập để đặt hàng");
+        setIsProcessing(false);
+        setTimeout(() => navigate('/login'), 2000);
+        return;
+      }
+      
+      // Validate form data
+      if (!name.trim() || !phone.trim() || !address.trim()) {
+        setError("Vui lòng điền đầy đủ thông tin");
+        setIsProcessing(false);
+        return;
+      }
+      
       // Get items either from cart or from localStorage
       const orderItems = checkoutItems.length > 0 ? checkoutItems : items;
       
@@ -65,73 +80,26 @@ const CashOnDeliveryConfirm: React.FC = () => {
         return;
       }
       
-      // Kiểm tra tồn kho trước khi đặt hàng
-      try {
-        // Cập nhật thông tin tồn kho mới nhất từ server
-        await Promise.all(orderItems.map(async (item) => {
-          const updatedStock = await stockManager.getStock(item.product.id, true);
-          if (updatedStock >= 0) {
-            item.product.stock = updatedStock;
-          }
-        }));
-        
-        // Kiểm tra xem có đủ hàng không
-        const insufficientItems = orderItems.filter(item => item.quantity > item.product.stock);
-        if (insufficientItems.length > 0) {
-          const itemNames = insufficientItems.map(item => 
-            `${item.product.name} (Còn ${item.product.stock}, cần ${item.quantity})`
-          ).join(', ');
-          throw new Error(`Không đủ hàng tồn kho cho: ${itemNames}`);
-        }
-      } catch (stockError) {
-        console.error("Error checking stock:", stockError);
-        setError(stockError instanceof Error ? stockError.message : "Lỗi kiểm tra tồn kho");
-        setIsProcessing(false);
-        return;
-      }
-      
-      // Kiểm tra tồn kho từ API
-      try {
-        const stockValid = await orderService.checkStockLevels(orderItems);
-        if (!stockValid) {
-          throw new Error("Một số sản phẩm trong đơn hàng đã hết hàng.");
-        }
-      } catch (stockApiError) {
-        console.error("Stock check API error:", stockApiError);
-        // Tiếp tục với dữ liệu tồn kho đã kiểm tra ở phía client
-      }
-      
-      // Create the order request
+      // Create the order request (không cần userId - backend sẽ tự lấy từ JWT token)
       const orderRequest: CreateOrderRequest = {
         items: orderItems.map(item => ({
-          productId: item.product.id,
+          productId: parseInt(item.product.id), // Convert string ID to number
           quantity: item.quantity
         })),
-        shippingAddress: {
-          firstName: name.split(' ')[0] || 'N/A',
-          lastName: name.split(' ').slice(1).join(' ') || 'N/A',
-          email: user?.email || '',
-          phone,
-          address,
-          city,
-          zipCode
-        },
-        paymentMethod: 'cod'
+        shippingAddress: `${name}, ${phone}, ${address}, ${city}, ${zipCode}`,
+        paymentMethod: 'cash_on_delivery'
       };
       
       // Gọi API để đặt hàng và cập nhật tồn kho
       const response = await orderService.createOrder(orderRequest);
       
       if (response) {
-        // Cập nhật số lượng tồn kho ở phía client
-        stockManager.updateLocalStock(orderItems);
-        
-        // Clear cart since order was successful
-        clearCart();
-        
         // Clear checkout items from localStorage
         localStorage.removeItem('checkoutItems');
         localStorage.removeItem('checkoutTotal');
+        
+        // Xóa giỏ hàng sau khi đặt hàng thành công
+        await handleOrderSuccess(orderItems);
         
         setConfirmed(true);
         
@@ -160,7 +128,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
-  <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-12 text-center border border-blue-100">
+      <div className="max-w-2xl w-full bg-white rounded-2xl shadow-xl p-12 text-center border border-blue-100">
         <h1 className="text-2xl font-bold text-blue-700 mb-4">Xác nhận thông tin nhận hàng</h1>
           {/* Thông tin đơn hàng rõ ràng */}
           <div className="mb-6 bg-green-50 rounded-xl p-4 text-left border border-green-100">
@@ -236,9 +204,19 @@ const CashOnDeliveryConfirm: React.FC = () => {
             />
           </div>
           {error && (
-            <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-              <span>{error}</span>
+            <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
+              <div className="flex items-center">
+                <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+              {error.includes('đăng nhập') && (
+                <button
+                  onClick={() => navigate('/login')}
+                  className="mt-2 w-full px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                >
+                  Đăng nhập ngay
+                </button>
+              )}
             </div>
           )}
           

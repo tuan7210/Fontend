@@ -32,6 +32,7 @@ import AdminSettings from './pages/admin/AdminSettings';
 import CashOnDeliveryInfo from './pages/CashOnDeliveryInfo';
 import CashOnDeliveryConfirm from './pages/CashOnDeliveryConfirm';
 import LoadingSpinner from './components/UI/LoadingSpinner';
+import StockNotification from './components/UI/StockNotification';
 
 // Protected route component
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ 
@@ -68,6 +69,7 @@ const MainLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         {children}
       </main>
       <Footer />
+      <StockNotification />
     </div>
   );
 };
