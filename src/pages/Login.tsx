@@ -22,7 +22,6 @@ const Login: React.FC = () => {
   // Nếu người dùng đã đăng nhập, chuyển hướng dựa vào vai trò
   useEffect(() => {
     if (user) {
-      console.log('User already logged in:', user);
       if (user.role === 'admin') {
         navigate('/admin');
       } else {
@@ -45,15 +44,12 @@ const Login: React.FC = () => {
 
     try {
       const result = await login(formData.email, formData.password);
-      console.log('Login result:', result); // Debug: In kết quả đăng nhập
       if (result.success) {
         // Kiểm tra vai trò người dùng để chuyển hướng đến trang thích hợp
         if (result.role === 'admin') {
-          console.log('Admin login detected, navigating to /admin'); // Debug: Xác nhận vai trò admin
           // Nếu là admin, chuyển đến trang admin panel
           navigate('/admin');
         } else {
-          console.log('User login detected, navigating to', redirect); // Debug: Xác nhận vai trò user
           // Nếu là khách hàng hoặc vai trò khác, chuyển đến trang ban đầu
           navigate(redirect);
         }

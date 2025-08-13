@@ -97,3 +97,44 @@ export interface CartContextType {
   getItemsCount: () => number;
   getTotalPrice: () => number;
 }
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message?: string;
+  data?: T;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  totalCount: number;
+  pageNumber: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage?: boolean;
+  hasPreviousPage?: boolean;
+}
+
+export interface OrderResponse {
+  orderId: number;
+  userId?: number;
+  username: string;
+  orderDate: Date;
+  status: string;
+  totalAmount: number;
+  paymentStatus?: string;
+  paymentMethod?: string;
+  shippingAddress?: string;
+  items: OrderItem[];
+  email?: string;
+  phone?: string;
+}
+
+export interface OrderItem {
+  orderItemId: number;
+  productId?: number;
+  productName: string;
+  imageUrl?: string;
+  quantity: number;
+  price: number;
+  subtotal: number;
+}

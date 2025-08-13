@@ -46,7 +46,6 @@ const OrderDetail: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch order details:', error);
       } finally {
         setLoading(false);
       }
@@ -166,7 +165,6 @@ const OrderDetail: React.FC = () => {
                                 }
                               })
                               .catch(error => {
-                                console.error('Error cancelling order:', error);
                                 alert('Không thể hủy đơn hàng. Vui lòng thử lại sau.');
                               });
                           }

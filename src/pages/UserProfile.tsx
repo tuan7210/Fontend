@@ -78,7 +78,6 @@ const UserProfile: React.FC = () => {
               recentOrders: [],
             };
           } catch (parseError) {
-            console.error('Error parsing user data from localStorage:', parseError);
           }
         }
         
@@ -100,7 +99,6 @@ const UserProfile: React.FC = () => {
             recentOrders: me.recentOrders,
           };
         } catch (apiError) {
-          console.warn('Could not fetch customer details from API:', apiError);
           // Nếu không lấy được từ API nhưng đã có thông tin cơ bản, vẫn tiếp tục
           if (!prof) {
             throw apiError; // Rethrow nếu không có thông tin cơ bản
@@ -113,7 +111,6 @@ const UserProfile: React.FC = () => {
         }
       } catch (e: unknown) {
         if (!ignore) {
-          console.error('Error in UserProfile:', e);
           setError(e instanceof Error ? e.message : String(e));
         }
       } finally {
@@ -179,7 +176,6 @@ const UserProfile: React.FC = () => {
         }
       } catch (refreshError) {
         // Silent fail - we still updated the profile successfully
-        console.error('Could not refresh metrics:', refreshError);
       }
       setEditing(false);
     } catch (err: unknown) {
@@ -275,7 +271,6 @@ const UserProfile: React.FC = () => {
         }));
       }
     } catch (e: unknown) {
-      console.error('Error refreshing user profile:', e);
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRefreshing(false);

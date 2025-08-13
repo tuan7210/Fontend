@@ -1,0 +1,213 @@
+const API_BASE_URL = 'http://localhost:5000/api';
+
+// Interfaces for Review Management
+export interface ReviewManagementDto {
+  reviewId: number;
+  userId: number;
+  userName: string;
+  userEmail: string;
+  productId: number;
+  productName: string;
+  productBrand: string;
+  productImageUrl: string;
+  orderItemId: number;
+  orderId: number;
+  rating: number;
+  comment: string;
+  isVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  orderStatus: string;
+}
+
+export interface ProductReviewSummaryDto {
+  productId: number;
+  productName: string;
+  brand: string;
+  imageUrl: string;
+  totalReviews: number;
+  verifiedReviews: number;
+  averageRating: number;
+  ratingDistribution: Record<string, number>;
+  recentReviews: ReviewManagementDto[];
+}
+
+export interface ReviewFilterDto {
+  productId?: number;
+  userId?: number;
+  rating?: number;
+  isVerified?: boolean;
+  productName?: string;
+  userName?: string;
+  brand?: string;
+  fromDate?: string;
+  toDate?: string;
+  searchKeyword?: string;
+  sortBy?: string;
+  sortOrder?: string;
+  page: number;
+  pageSize: number;
+}
+
+export interface ReviewStatisticsDto {
+  totalReviews: number;
+  verifiedReviews: number;
+  unverifiedReviews: number;
+  pendingReviews: number;
+  averageRating: number;
+  ratingDistribution: Record<string, number>;
+  reviewsThisMonth: number;
+  reviewsLastMonth: number;
+  topReviewedProducts: Array<{
+    productId: number;
+    productName: string;
+    brand: string;
+    imageUrl: string;
+    reviewCount: number;
+    averageRating: number;
+  }>;
+  mostActiveReviewers: Array<{
+    userId: number;
+    userName: string;
+    userEmail: string;
+    reviewCount: number;
+    averageRating: number;
+    verifiedReviewCount: number;
+  }>;
+}
+
+export interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+  pagination?: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
+class ReviewService {
+  private getAuthHeaders() {
+    const token = localStorage.getItem('token');
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    };
+  }
+
+  private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.message || 'Có lỗi xảy ra');
+    }
+    
+    return data;
+  }
+
+  // Lấy thống kê tổng quan
+  async getReviewStatistics(): Promise<ApiResponse<ReviewStatisticsDto>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+    
+    return this.handleResponse<ReviewStatisticsDto>(response);
+  }
+
+  // Lấy danh sách đánh giá với filter
+  async getReviews(filter: ReviewFilterDto): Promise<ApiResponse<ReviewManagementDto[]>> {
+    const params = new URLSearchParams();
+    
+    if (filter.productId) params.append('productId', filter.productId.toString());
+    if (filter.userId) params.append('userId', filter.userId.toString());
+    if (filter.rating) params.append('rating', filter.rating.toString());
+    if (filter.isVerified !== undefined) params.append('isVerified', filter.isVerified.toString());
+    if (filter.productName) params.append('productName', filter.productName);
+    if (filter.userName) params.append('userName', filter.userName);
+    if (filter.brand) params.append('brand', filter.brand);
+    if (filter.fromDate) params.append('fromDate', filter.fromDate);
+    if (filter.toDate) params.append('toDate', filter.toDate);
+    if (filter.searchKeyword) params.append('searchKeyword', filter.searchKeyword);
+    if (filter.sortBy) params.append('sortBy', filter.sortBy);
+    if (filter.sortOrder) params.append('sortOrder', filter.sortOrder);
+    
+    params.append('page', filter.page.toString());
+    params.append('pageSize', filter.pageSize.toString());
+
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement?${params.toString()}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+
+    return this.handleResponse<ReviewManagementDto[]>(response);
+  }
+
+  // Lấy tổng quan đánh giá của một sản phẩm
+  async getProductReviewSummary(productId: number): Promise<ApiResponse<ProductReviewSummaryDto>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement/product/${productId}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders()
+    });
+
+    return this.handleResponse<ProductReviewSummaryDto>(response);
+  }
+
+  // Duyệt đánh giá
+  async verifyReview(reviewId: number): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement/${reviewId}/verify`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({})
+    });
+
+    return this.handleResponse<any>(response);
+  }
+
+  // Hủy duyệt đánh giá
+  async unverifyReview(reviewId: number): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement/${reviewId}/unverify`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({})
+    });
+
+    return this.handleResponse<any>(response);
+  }
+
+  // Xóa đánh giá
+  async deleteReview(reviewId: number): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement/${reviewId}`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders()
+    });
+
+    return this.handleResponse<any>(response);
+  }
+
+  // Duyệt nhiều đánh giá
+  async bulkVerifyReviews(reviewIds: number[]): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement/bulk-verify`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ reviewIds })
+    });
+
+    return this.handleResponse<any>(response);
+  }
+
+  // Xóa nhiều đánh giá
+  async bulkDeleteReviews(reviewIds: number[]): Promise<ApiResponse<any>> {
+    const response = await fetch(`${API_BASE_URL}/admin/ReviewManagement/bulk-delete`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ reviewIds })
+    });
+
+    return this.handleResponse<any>(response);
+  }
+}
+
+export const reviewService = new ReviewService();

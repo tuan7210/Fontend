@@ -32,7 +32,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
           const userData = JSON.parse(savedUser);
           setName(userData.name || '');
         } catch (e) {
-          console.error('Error parsing user data:', e);
         }
       }
     }
@@ -43,7 +42,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
       try {
         setCheckoutItems(JSON.parse(storedItems));
       } catch (e) {
-        console.error('Error parsing checkout items:', e);
       }
     }
   }, [user]);
@@ -118,7 +116,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
         }, 1800);
       }
     } catch (err) {
-      console.error("Error placing order:", err);
       setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra khi đặt hàng");
       setConfirmed(false);
     } finally {

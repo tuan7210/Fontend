@@ -50,7 +50,6 @@ const Home: React.FC = () => {
         if (categoryFromURL) {
           // Nếu có tham số danh mục, tải sản phẩm theo danh mục
           productResults = await productService.getProductsByCategory(categoryFromURL);
-          console.log(`Đã tải ${productResults.length} sản phẩm cho danh mục: ${categoryFromURL}`);
         } else {
           // Ngược lại tải tất cả sản phẩm với tham số mặc định
           const response = await productService.getProducts({ pageSize: 100 });
@@ -59,7 +58,6 @@ const Home: React.FC = () => {
         
         setProducts(productResults);
       } catch (error) {
-        console.error('Failed to fetch products:', error);
         setError('Không thể tải dữ liệu sản phẩm. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
@@ -97,7 +95,6 @@ const Home: React.FC = () => {
       }, 2000);
       
     } catch (error) {
-      console.error('Failed to refresh products:', error);
       setError('Không thể làm mới dữ liệu sản phẩm.');
     } finally {
       setRefreshing(false);
@@ -202,7 +199,6 @@ const Home: React.FC = () => {
         
         setProducts(response.items);
       } catch (error) {
-        console.error('Failed to fetch all products:', error);
       } finally {
         setLoading(false);
       }

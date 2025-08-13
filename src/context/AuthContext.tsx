@@ -31,7 +31,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const login = async (email: string, password: string): Promise<{ success: boolean; message: string; role?: string }> => {
     try {
       const result = await authService.login(email, password);
-      console.log('authService login result:', result); // Debug
       if (result.success) {
         // Tài khoản admin mẫu
         const isAdminAccount = email.toLowerCase() === 'admin@techstore.com';

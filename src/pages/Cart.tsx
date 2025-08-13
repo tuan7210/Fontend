@@ -42,7 +42,6 @@ const Cart: React.FC = () => {
         navigate(`/checkout?method=online`);
       }
     } catch (error) {
-      console.error('Checkout error:', error);
       setError(typeof error === 'string' ? error : 
         error instanceof Error ? error.message : 'Đã có lỗi xảy ra khi xử lý đơn hàng');
     } finally {

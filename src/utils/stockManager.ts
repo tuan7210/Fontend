@@ -32,7 +32,6 @@ export const stockManager = {
       try {
         callback(productId, newStock);
       } catch (error) {
-        console.error('Error in stock subscriber:', error);
       }
     });
   },
@@ -71,7 +70,6 @@ export const stockManager = {
         return currentStock;
       }
     } catch (error) {
-      console.error('Error syncing with server:', error);
     }
     return null;
   },
@@ -103,7 +101,6 @@ export const stockManager = {
         };
         localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
       } catch (error) {
-        console.error('Error saving to localStorage:', error);
       }
       
       // Cập nhật product stock trong memory để các component khác có thể sử dụng
@@ -116,7 +113,6 @@ export const stockManager = {
         try {
           await this.syncWithServer(item.product.id);
         } catch (error) {
-          console.error(`Error syncing ${item.product.id} with server:`, error);
         }
       }
     }, 500);
@@ -138,7 +134,6 @@ export const stockManager = {
         }
       });
     } catch (error) {
-      console.error('Error restoring from localStorage:', error);
     }
   },
 
@@ -183,12 +178,6 @@ export const stockManager = {
    * Debug function - kiểm tra trạng thái hiện tại
    */
   debug(): void {
-    console.log('=== StockManager Debug ===');
-    console.log('Subscribers count:', this.subscribers.size);
-    console.log('Updated products:', Array.from(this.updatedProducts.entries()));
-    console.log('Last updates:', Array.from(this.lastUpdate.entries()));
-    console.log('localStorage stockUpdates:', localStorage.getItem('stockUpdates'));
-    console.log('=========================');
   }
 };
 

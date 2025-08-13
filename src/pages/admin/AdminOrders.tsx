@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { Order } from '../../types';
+import { Order, OrderResponse } from '../../types';
 import { ShoppingCart, Search, Eye, Truck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
 
 const AdminOrders: React.FC = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [updatingOrder, setUpdatingOrder] = useState<string | null>(null);
+  const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
+  const [updatingOrder, setUpdatingOrder] = useState<number | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -19,40 +19,24 @@ const AdminOrders: React.FC = () => {
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const data = await orderService.getOrders();
+      const data = await orderService.getOrders(search);
       setOrders(data);
     } catch (error) {
-      console.error("Error fetching orders:", error);
       // handle error
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (orderId: string, newStatus: Order['status']) => {
+  const handleUpdateStatus = async (orderId: number, newStatus: OrderResponse['status']) => {
     setUpdatingOrder(orderId);
-    try {
-      const updatedOrder = await orderService.updateOrderStatus(orderId, newStatus);
-      if (updatedOrder) {
-        // Cập nhật lại danh sách đơn hàng
-        setOrders(orders.map(o => o.id === orderId ? {...o, status: newStatus, updatedAt: new Date().toISOString()} : o));
-        
-        // Cập nhật order đang được xem chi tiết
-        if (selectedOrder && selectedOrder.id === orderId) {
-          setSelectedOrder({...selectedOrder, status: newStatus, updatedAt: new Date().toISOString()});
-        }
-        
-        alert(`Đơn hàng ${orderId} đã được cập nhật thành ${getStatusName(newStatus)}`);
-      }
-    } catch (error) {
-      console.error("Error updating order status:", error);
-      alert("Có lỗi xảy ra khi cập nhật trạng thái đơn hàng");
-    } finally {
-      setUpdatingOrder(null);
-    }
+    await orderService.updateOrderStatus(orderId, newStatus);
+    setSelectedOrder(null);
+    setUpdatingOrder(null);
+    fetchOrders();
   };
   
-  const getStatusName = (status: Order['status']): string => {
+  const getStatusName = (status: OrderResponse['status']): string => {
     switch (status) {
       case 'pending': return 'Chờ xác nhận';
       case 'processing': return 'Đang xử lý';
@@ -63,7 +47,7 @@ const AdminOrders: React.FC = () => {
     }
   };
   
-  const getStatusIcon = (status: Order['status']) => {
+  const getStatusIcon = (status: OrderResponse['status']) => {
     switch (status) {
       case 'pending': return <Clock className="w-4 h-4 text-yellow-500" />;
       case 'processing': return <AlertTriangle className="w-4 h-4 text-blue-500" />;
@@ -74,7 +58,7 @@ const AdminOrders: React.FC = () => {
     }
   };
   
-  const getStatusColor = (status: Order['status']): string => {
+  const getStatusColor = (status: OrderResponse['status']): string => {
     switch (status) {
       case 'pending': return 'bg-yellow-100 text-yellow-700';
       case 'processing': return 'bg-blue-100 text-blue-700';
@@ -85,11 +69,10 @@ const AdminOrders: React.FC = () => {
     }
   };
 
-  const filteredOrders = orders.filter((o: any) =>
-    o.id.toLowerCase().includes(search.toLowerCase()) ||
-    o.status.toLowerCase().includes(search.toLowerCase()) ||
-    (o.userId && o.userId.toLowerCase().includes(search.toLowerCase()))
-  );
+  const onViewOrderDetail = async (order: OrderResponse) => {
+    const orderDetail = await orderService.getOrderById(order.orderId);
+    setSelectedOrder(orderDetail);
+  }
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -104,8 +87,8 @@ const AdminOrders: React.FC = () => {
           <input
             type="text"
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Tìm kiếm mã đơn, trạng thái..."
+            onChange={e => {setSearch(e.target.value); fetchOrders()}}
+            placeholder="Tìm kiếm tên khách hàng"
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -130,21 +113,20 @@ const AdminOrders: React.FC = () => {
                   <LoadingSpinner size="md" />
                 </td>
               </tr>
-            ) : filteredOrders.length === 0 ? (
+            ) : orders.length === 0 ? (
               <tr>
                 <td colSpan={6} className="text-center py-8 text-gray-500">
                   Không có đơn hàng nào phù hợp.
                 </td>
               </tr>
             ) : (
-              filteredOrders.map((order: Order) => (
-                <tr key={order.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                  <td className="py-3 px-4 font-semibold text-gray-800">{order.id}</td>
+              orders.map((order: OrderResponse) => (
+                <tr key={order.orderId} className="border-b last:border-b-0 hover:bg-gray-50">
+                  <td className="py-3 px-4 font-semibold text-gray-800">{order.orderId}</td>
                   <td className="py-3 px-4 text-gray-600">
-                    <div>{order.shippingAddress?.firstName} {order.shippingAddress?.lastName}</div>
-                    <div className="text-xs text-gray-500">{order.userId}</div>
+                    <div>{order.username}</div>
                   </td>
-                  <td className="py-3 px-4 text-blue-700 font-bold">{order.total.toLocaleString()} đ</td>
+                  <td className="py-3 px-4 text-blue-700 font-bold">{order.totalAmount.toLocaleString()} đ</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-2">
                       {getStatusIcon(order.status)}
@@ -153,11 +135,11 @@ const AdminOrders: React.FC = () => {
                       </span>
                     </div>
                   </td>
-                  <td className="py-3 px-4 text-gray-500">{new Date(order.createdAt).toLocaleDateString()}</td>
+                  <td className="py-3 px-4 text-gray-500">{new Date(order.orderDate).toLocaleDateString()}</td>
                   <td className="py-3 px-4 text-center">
                     <button 
                       className="p-2 rounded hover:bg-blue-50 text-blue-600"
-                      onClick={() => setSelectedOrder(order)}
+                      onClick={() => onViewOrderDetail(order)}
                     >
                       <Eye className="w-4 h-4" />
                     </button>
@@ -174,7 +156,7 @@ const AdminOrders: React.FC = () => {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl p-6">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-bold text-blue-700">Chi tiết đơn hàng #{selectedOrder.id}</h2>
+              {/* <h2 className="text-xl font-bold text-blue-700">Chi tiết đơn hàng #{selectedOrder.orderId}</h2> */}
               <button 
                 onClick={() => setSelectedOrder(null)}
                 className="text-gray-500 hover:text-gray-700"
@@ -189,11 +171,11 @@ const AdminOrders: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Mã đơn hàng:</span>
-                    <span className="font-semibold">{selectedOrder.id}</span>
+                    <span className="font-semibold">{selectedOrder.orderId}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Ngày đặt hàng:</span>
-                    <span>{new Date(selectedOrder.createdAt).toLocaleString()}</span>
+                    <span>{new Date(selectedOrder.orderDate).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Trạng thái:</span>
@@ -203,7 +185,7 @@ const AdminOrders: React.FC = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tổng tiền:</span>
-                    <span className="font-bold text-blue-700">{selectedOrder.total.toLocaleString()} đ</span>
+                    <span className="font-bold text-blue-700">{selectedOrder.totalAmount.toLocaleString()} đ</span>
                   </div>
                 </div>
               </div>
@@ -213,19 +195,19 @@ const AdminOrders: React.FC = () => {
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Tên:</span>
-                    <span>{selectedOrder.shippingAddress.firstName} {selectedOrder.shippingAddress.lastName}</span>
+                    <span>{selectedOrder.username}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Email:</span>
-                    <span>{selectedOrder.shippingAddress.email}</span>
+                    <span>{selectedOrder.email}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Số điện thoại:</span>
-                    <span>{selectedOrder.shippingAddress.phone}</span>
+                    <span>{selectedOrder.phone}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Địa chỉ:</span>
-                    <span className="text-right">{selectedOrder.shippingAddress.address}, {selectedOrder.shippingAddress.city}</span>
+                    <span className="text-right">{selectedOrder.shippingAddress}</span>
                   </div>
                 </div>
               </div>
@@ -245,20 +227,20 @@ const AdminOrders: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedOrder.items.map((item) => (
-                      <tr key={item.id} className="border-t">
-                        <td className="py-3 px-4 font-medium">{item.product.name}</td>
+                    {selectedOrder.items.map((item, index) => (
+                      <tr key={index} className="border-t">
+                        <td className="py-3 px-4 font-medium">{item.productName}</td>
                         <td className="py-3 px-4 text-center">
                           <img 
-                            src={item.product.image} 
-                            alt={item.product.name} 
+                            // src={item.product.image} 
+                            // alt={item.product.name} 
                             className="w-16 h-16 object-cover rounded mx-auto"
                           />
                         </td>
-                        <td className="py-3 px-4 text-center">{item.product.price.toLocaleString()} đ</td>
+                        <td className="py-3 px-4 text-center">{item.price.toLocaleString()} đ</td>
                         <td className="py-3 px-4 text-center">{item.quantity}</td>
                         <td className="py-3 px-4 text-right font-semibold text-blue-700">
-                          {(item.quantity * item.product.price).toLocaleString()} đ
+                          {(item.subtotal).toLocaleString()} đ
                         </td>
                       </tr>
                     ))}
@@ -266,7 +248,7 @@ const AdminOrders: React.FC = () => {
                   <tfoot>
                     <tr className="bg-gray-100 font-semibold">
                       <td colSpan={4} className="py-3 px-4 text-right">Tổng cộng:</td>
-                      <td className="py-3 px-4 text-right text-blue-700 font-bold">{selectedOrder.total.toLocaleString()} đ</td>
+                      <td className="py-3 px-4 text-right text-blue-700 font-bold">{selectedOrder.totalAmount.toLocaleString()} đ</td>
                     </tr>
                   </tfoot>
                 </table>
@@ -278,9 +260,9 @@ const AdminOrders: React.FC = () => {
               <div className="flex flex-wrap gap-2">
                 {selectedOrder.status !== 'pending' && (
                   <Button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'pending')}
+                    onClick={() => handleUpdateStatus(selectedOrder.orderId, 'pending')}
                     className="bg-yellow-500 hover:bg-yellow-600 flex items-center gap-1"
-                    disabled={updatingOrder === selectedOrder.id}
+                    disabled={updatingOrder === selectedOrder.orderId}
                   >
                     <Clock className="w-4 h-4" />
                     Chờ xác nhận
@@ -289,9 +271,9 @@ const AdminOrders: React.FC = () => {
                 
                 {selectedOrder.status !== 'processing' && (
                   <Button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'processing')}
+                    onClick={() => handleUpdateStatus(selectedOrder.orderId, 'processing')}
                     className="bg-blue-500 hover:bg-blue-600 flex items-center gap-1"
-                    disabled={updatingOrder === selectedOrder.id}
+                    disabled={updatingOrder === selectedOrder.orderId}
                   >
                     <AlertTriangle className="w-4 h-4" />
                     Đang xử lý
@@ -300,9 +282,9 @@ const AdminOrders: React.FC = () => {
                 
                 {selectedOrder.status !== 'shipped' && (
                   <Button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'shipped')}
+                    onClick={() => handleUpdateStatus(selectedOrder.orderId, 'shipped')}
                     className="bg-purple-500 hover:bg-purple-600 flex items-center gap-1"
-                    disabled={updatingOrder === selectedOrder.id}
+                    disabled={updatingOrder === selectedOrder.orderId}
                   >
                     <Truck className="w-4 h-4" />
                     Đang giao
@@ -311,9 +293,9 @@ const AdminOrders: React.FC = () => {
                 
                 {selectedOrder.status !== 'delivered' && (
                   <Button
-                    onClick={() => handleUpdateStatus(selectedOrder.id, 'delivered')}
+                    onClick={() => handleUpdateStatus(selectedOrder.orderId, 'delivered')}
                     className="bg-green-500 hover:bg-green-600 flex items-center gap-1"
-                    disabled={updatingOrder === selectedOrder.id}
+                    disabled={updatingOrder === selectedOrder.orderId}
                   >
                     <CheckCircle2 className="w-4 h-4" />
                     Đã giao
@@ -324,18 +306,18 @@ const AdminOrders: React.FC = () => {
                   <Button
                     onClick={() => {
                       if (window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này?")) {
-                        handleUpdateStatus(selectedOrder.id, 'cancelled');
+                        handleUpdateStatus(selectedOrder.orderId, 'cancelled');
                       }
                     }}
                     className="bg-red-500 hover:bg-red-600 flex items-center gap-1"
-                    disabled={updatingOrder === selectedOrder.id}
+                    disabled={updatingOrder === selectedOrder.orderId}
                   >
                     <XCircle className="w-4 h-4" />
                     Hủy đơn
                   </Button>
                 )}
                 
-                {updatingOrder === selectedOrder.id && (
+                {updatingOrder === selectedOrder.orderId && (
                   <span className="flex items-center gap-2 text-gray-600">
                     <LoadingSpinner size="sm" />
                     Đang cập nhật...

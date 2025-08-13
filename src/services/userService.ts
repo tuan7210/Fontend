@@ -52,7 +52,6 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<Envelop
     };
     
     const url = `${API_URL}${path}`;
-    console.log(`API Request: ${options.method || 'GET'} ${url}`);
     
     const res = await fetch(url, { ...options, headers });
     const contentType = res.headers.get('content-type') || '';
@@ -61,14 +60,12 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<Envelop
     let json: unknown = null;
     if (isJson) {
       json = await res.json().catch((error) => {
-        console.error('Error parsing JSON response:', error);
         return null;
       });
     }
     
     if (!res.ok) {
       let msg = res.statusText || 'Request failed';
-      console.error(`API Error (${res.status}):`, { url, method: options.method, response: json });
       
       if (isJson && json && typeof json === 'object') {
         if ('message' in json) {
@@ -82,7 +79,6 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<Envelop
         const text = await res.text().catch(() => '');
         if (text) {
           msg = text;
-          console.error('Non-JSON error response:', text);
         }
       }
       
@@ -97,7 +93,6 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<Envelop
     // Assume JSON envelope on success
     return (json as Envelope<T>) ?? ({ success: true } as Envelope<T>);
   } catch (error) {
-    console.error('API Request failed:', error);
     throw error;
   }
 }
@@ -157,7 +152,6 @@ export async function getCurrentCustomer(): Promise<Customer> {
     const userInfo = localStorage.getItem('userInfo');
     
     if (!token || !userInfo) {
-      console.warn('Người dùng chưa đăng nhập (không có token hoặc user data)');
       throw new Error('Người dùng chưa đăng nhập');
     }
     
@@ -166,20 +160,16 @@ export async function getCurrentCustomer(): Promise<Customer> {
     try {
       user = JSON.parse(userInfo);
     } catch (e) {
-      console.error('Không thể parse dữ liệu user từ localStorage:', e);
       throw new Error('Dữ liệu người dùng không hợp lệ');
     }
     
     // Thử gọi API endpoint /api/Customer/me trước
     try {
-      console.log('Đang gọi API endpoint /api/Customer/me...');
       const resp = await http<ApiCustomer>(`/api/Customer/${user.id}`);
       if (resp.data) {
-        console.log('Đã lấy thông tin người dùng từ /api/Customer/me');
         return mapApiCustomer(resp.data as ApiCustomer);
       }
     } catch (meApiError) {
-      console.warn('Error calling /api/Customer/me:', meApiError);
       // Tiếp tục thử phương pháp khác nếu endpoint này thất bại
     }
     
@@ -188,21 +178,17 @@ export async function getCurrentCustomer(): Promise<Customer> {
     
     if (userId) {
       // Nếu có userId, lấy thông tin chi tiết của user từ API
-      console.log(`Đang lấy thông tin người dùng từ ID: ${userId}`);
       try {
         const resp = await http<ApiCustomer>(`/api/Customer/${userId}`);
         if (resp.data) {
-          console.log(`Đã lấy thông tin người dùng với ID: ${userId}`);
           return mapApiCustomer(resp.data as ApiCustomer);
         }
       } catch (error) {
-        console.warn(`Không thể lấy thông tin từ /api/Customer/${userId}:`, error);
         // Tiếp tục với fallback
       }
     }
     
     // Fallback: tạo customer từ thông tin có sẵn trong localStorage
-    console.log('Sử dụng thông tin người dùng từ localStorage làm fallback');
     return {
       userId: user.userId || 0,
       name: user.name || '',
@@ -216,10 +202,8 @@ export async function getCurrentCustomer(): Promise<Customer> {
       recentOrders: [],
     };
   } catch (error) {
-    console.error('Error getting current customer:', error);
     
     // Nếu tất cả đều thất bại, tạo user mặc định để tránh lỗi UI
-    console.warn('Trả về thông tin người dùng mặc định để tránh lỗi UI');
     return {
       userId: 0,
       name: 'Khách',
@@ -264,7 +248,6 @@ export async function updateCurrentCustomer(input: UpdateCustomerInput): Promise
         const user = JSON.parse(userData);
         userId = user.userId;
       } catch (e) {
-        console.error('Không thể parse dữ liệu user từ localStorage:', e);
       }
     }
     
@@ -273,7 +256,6 @@ export async function updateCurrentCustomer(input: UpdateCustomerInput): Promise
     }
     
     // Sử dụng userId để cập nhật thông tin user
-    console.log(`Đang cập nhật thông tin người dùng với ID: ${userId}`);
     const resp = await http<ApiCustomer>(`/api/Customer/${userId}`, {
       method: 'PUT',
       body: JSON.stringify({
@@ -299,12 +281,10 @@ export async function updateCurrentCustomer(input: UpdateCustomerInput): Promise
         localStorage.setItem('user', JSON.stringify(updatedUser));
       }
     } catch (e) {
-      console.warn('Không thể cập nhật thông tin user trong localStorage:', e);
     }
     
     return mapApiCustomer(resp.data as ApiCustomer);
   } catch (error) {
-    console.error('Error updating current customer:', error);
     throw error;
   }
 }

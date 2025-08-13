@@ -63,7 +63,6 @@ const ProductDetail: React.FC = () => {
           }
         }
       } catch (error) {
-        console.error('Failed to fetch product:', error);
       } finally {
         setLoading(false);
         setIsStockUpdating(false);
@@ -93,7 +92,6 @@ const ProductDetail: React.FC = () => {
             );
           }
         } catch (error) {
-          console.error('Error syncing stock:', error);
         } finally {
           setIsStockUpdating(false);
         }

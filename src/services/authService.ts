@@ -10,7 +10,6 @@ export const authService = {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
-      console.log('API login response:', data); // Debug: In phản hồi từ API
       
       // Kiểm tra nếu tài khoản bị khóa
       if (response.ok && data.status === 'locked') {
@@ -28,7 +27,6 @@ export const authService = {
         
         // Đảm bảo có đủ thông tin người dùng
         if (!data.userId) {
-          console.warn('API login không trả về userId. Đang lấy thông tin chi tiết từ /api/Customer/me...');
           
           try {
             // Gọi API để lấy thông tin chi tiết người dùng
@@ -56,7 +54,6 @@ export const authService = {
               }
             }
           } catch (userApiError) {
-            console.error('Không thể lấy thông tin người dùng chi tiết:', userApiError);
           }
         }
         
@@ -73,7 +70,6 @@ export const authService = {
       }
       return { success: false, message: data.message || 'Đăng nhập thất bại.' };
     } catch (error) {
-      console.error('Login error:', error);
       return { success: false, message: 'Lỗi kết nối server.' };
     }
   },

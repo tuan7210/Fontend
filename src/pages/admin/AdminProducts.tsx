@@ -69,7 +69,6 @@ const AdminProducts: React.FC = () => {
         setCategories(categoriesResponse);
         setBrands(brandsResponse);
       } catch (error) {
-        console.error('Failed to load master data:', error);
         setErrorMsg('Không thể tải danh mục và thương hiệu. Vui lòng thử lại sau.');
       }
     };
@@ -112,7 +111,6 @@ const AdminProducts: React.FC = () => {
       setTotalPages(calculatedTotalPages);
       
     } catch (error) {
-      console.error('Failed to load products:', error);
       setErrorMsg('Không thể tải danh sách sản phẩm. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
@@ -183,6 +181,11 @@ const AdminProducts: React.FC = () => {
     
     setSelectedFile(file);
     setErrorMsg('');
+    
+    // Set the file in editingProduct and clear imageUrl
+    if (editingProduct) {
+      setEditingProduct({...editingProduct, file: file, imageUrl: ''});
+    }
     
     // Tạo URL xem trước ảnh
     const reader = new FileReader();
@@ -289,7 +292,6 @@ const AdminProducts: React.FC = () => {
       setShowModal(true);
       
     } catch (error) {
-      console.error('Failed to load product details:', error);
       setErrorMsg('Không thể tải thông tin sản phẩm. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
@@ -319,19 +321,6 @@ const AdminProducts: React.FC = () => {
         specifications: JSON.stringify(specs)
       };
       
-      // Xử lý upload ảnh nếu có
-      if (selectedFile) {
-        const reader = new FileReader();
-        const filePromise = new Promise<string>((resolve, reject) => {
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(selectedFile);
-        });
-        
-        const base64Image = await filePromise;
-        updatedProduct.imageUrl = base64Image;
-      }
-      
       if (modalMode === 'create') {
         // Gọi API tạo sản phẩm mới
         await productService.createProduct({
@@ -345,7 +334,8 @@ const AdminProducts: React.FC = () => {
           image: updatedProduct.imageUrl,
           specifications: specs,
           isNew: updatedProduct.isNew,
-          isBestSeller: updatedProduct.isBestSeller
+          isBestSeller: updatedProduct.isBestSeller,
+          file: updatedProduct.file
         });
         
         setSuccessMsg('Tạo sản phẩm mới thành công!');
@@ -362,7 +352,8 @@ const AdminProducts: React.FC = () => {
           image: updatedProduct.imageUrl,
           specifications: specs,
           isNew: updatedProduct.isNew,
-          isBestSeller: updatedProduct.isBestSeller
+          isBestSeller: updatedProduct.isBestSeller,
+          file: updatedProduct.file
         });
         
         // Notify stockManager về stock update
@@ -377,7 +368,6 @@ const AdminProducts: React.FC = () => {
           };
           localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
         } catch (error) {
-          console.error('Error saving admin update:', error);
         }
         
         setSuccessMsg('Cập nhật sản phẩm thành công!');
@@ -392,7 +382,6 @@ const AdminProducts: React.FC = () => {
       }, 1000);
       
     } catch (error) {
-      console.error('Failed to save product:', error);
       setErrorMsg(error instanceof Error ? error.message : 'Không thể lưu sản phẩm. Vui lòng thử lại sau.');
     } finally {
       setSaving(false);
@@ -419,7 +408,6 @@ const AdminProducts: React.FC = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('Failed to delete product:', error);
       setErrorMsg('Không thể xóa sản phẩm. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
@@ -458,7 +446,6 @@ const AdminProducts: React.FC = () => {
         };
         localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
       } catch (error) {
-        console.error('Error saving admin update:', error);
       }
       
       setSuccessMsg(`Cập nhật tồn kho thành công! (${currentStock} → ${stockNumber})`);
@@ -472,7 +459,6 @@ const AdminProducts: React.FC = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('Failed to update stock:', error);
       setErrorMsg('Không thể cập nhật tồn kho. Vui lòng thử lại sau.');
     } finally {
       setLoading(false);
@@ -733,14 +719,7 @@ const AdminProducts: React.FC = () => {
                   <tr key={product.id} className="border-t border-gray-200 hover:bg-gray-50">
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          className="w-12 h-12 object-cover rounded-md"
-                          onError={(e) => {
-                            (e.target as HTMLImageElement).src = 'https://via.placeholder.com/48?text=No+Image';
-                          }}
-                        />
+                        
                         <div>
                           <div className="font-medium text-gray-800">{product.name}</div>
                           <div className="text-xs text-gray-500 truncate max-w-[200px]">
@@ -994,7 +973,7 @@ const AdminProducts: React.FC = () => {
                 {(previewUrl || editingProduct?.imageUrl) && (
                   <div className="mt-2 p-2 border rounded-lg">
                     <img
-                      src={previewUrl || editingProduct?.imageUrl}
+                      src={previewUrl || `http://localhost:9981/${editingProduct?.imageUrl}`}
                       alt="Xem trước"
                       className="h-40 object-contain mx-auto"
                       onError={(e) => {

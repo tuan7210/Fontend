@@ -23,7 +23,8 @@ type ApiProduct = {
   name: string;
   price: number;
   originalPrice?: number | null;
-  imageUrl: string;
+  imageUrl?: string;
+  file?: File;
   brand: string;
   description: string;
   specifications: any; // may be object or JSON string depending on API
@@ -149,7 +150,6 @@ export const productService = {
       const response = await http<ApiEnvelope<ApiProduct>>(`/api/Product/${id}`);
       return mapApiProduct(response.data);
     } catch (e) {
-      console.error('Error fetching product', e);
       return null;
     }
   },
@@ -191,7 +191,6 @@ export const productService = {
         }
       }
     } catch (e) {
-      console.error('Error fetching by category', e);
       return [];
     }
   },
@@ -230,7 +229,6 @@ export const productService = {
       const response = await http<ApiEnvelope<Array<{ categoryId: number; name: string; description: string }>>>('/api/Product/categories');
       return response.data || [];
     } catch (e) {
-      console.error('Error fetching categories', e);
       return [];
     }
   },
@@ -241,7 +239,6 @@ export const productService = {
       const response = await http<ApiEnvelope<string[]>>('/api/Product/brands');
       return response.data || [];
     } catch (e) {
-      console.error('Error fetching brands', e);
       return [];
     }
   },
@@ -251,7 +248,8 @@ export const productService = {
     name: string;
     price: number;
     originalPrice?: number;
-    image: string; 
+    image?: string; 
+    file?: File;
     brand: string;
     description: string;
     specifications: Record<string, string> | string;
@@ -261,86 +259,91 @@ export const productService = {
     isNew?: boolean;
     isBestSeller?: boolean;
     categoryId: number;
-  }): Promise<Product> {
-    // Map from frontend model to API model
-    const payload: Partial<ApiProduct> = {
-      name: productData.name,
-      price: productData.price,
-      originalPrice: productData.originalPrice ?? null,
-      imageUrl: productData.image,
-      brand: productData.brand,
-      description: productData.description,
-      specifications: typeof productData.specifications === 'string' 
-        ? productData.specifications 
-        : JSON.stringify(productData.specifications || {}),
-      stockQuantity: productData.stock,
-      rating: productData.rating || 0,
-      reviewCount: productData.reviews || 0,
-      isNew: !!productData.isNew,
-      isBestSeller: !!productData.isBestSeller,
-      categoryId: productData.categoryId,
-    };
+  }, id?: number): Promise<boolean> {
+    // Create FormData for file upload support
+    const formData = new FormData();
     
-    const response = await http<ApiEnvelope<ApiProduct>>('/api/Product', {
+    formData.append('name', productData.name);
+    formData.append('price', productData.price.toString());
+    if (productData.originalPrice !== undefined) {
+      formData.append('originalPrice', productData.originalPrice.toString());
+    }
+    if (productData.image) {
+      formData.append('imageUrl', productData.image);
+    }
+    if (productData.file) {
+      formData.append('file', productData.file);
+    }
+    formData.append('brand', productData.brand);
+    formData.append('description', productData.description);
+    formData.append('specifications', typeof productData.specifications === 'string' 
+      ? productData.specifications 
+      : JSON.stringify(productData.specifications || {}));
+    formData.append('stockQuantity', productData.stock.toString());
+    formData.append('rating', (productData.rating || 0).toString());
+    formData.append('reviewCount', (productData.reviews || 0).toString());
+    formData.append('isNew', (!!productData.isNew).toString());
+    formData.append('isBestSeller', (!!productData.isBestSeller).toString());
+    formData.append('categoryId', productData.categoryId.toString());
+    
+    const res = await fetch(`${API_URL}/api/Product`, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: formData,
     });
-    
-    return mapApiProduct(response.data);
+    console.log(res);
+    return true;
   },
 
   // Update an existing product
-  async updateProduct(id: string, updates: {
-    name?: string;
-    price?: number;
-    originalPrice?: number | null;
-    image?: string;
-    brand?: string;
-    description?: string;
-    specifications?: Record<string, string> | string;
-    stock?: number;
+  async updateProduct(id: string, productData: {
+    name: string;
+    price: number;
+    originalPrice?: number;
+    image?: string; 
+    file?: File;
+    brand: string;
+    description: string;
+    specifications: Record<string, string> | string;
+    stock: number; 
     rating?: number;
     reviews?: number;
     isNew?: boolean;
     isBestSeller?: boolean;
-    categoryId?: number;
-  }): Promise<Product> {
-    // Fetch current product first to ensure we have all required fields
-    const current = await http<ApiEnvelope<ApiProduct>>(`/api/Product/${id}`);
-    const currentProduct = current.data;
+    categoryId: number;
+  }): Promise<boolean> {
+    const formData = new FormData();
     
-    // Handle specifications correctly
-    let specifications = currentProduct.specifications;
-    if (updates.specifications !== undefined) {
-      specifications = typeof updates.specifications === 'string' 
-        ? updates.specifications 
-        : JSON.stringify(updates.specifications || {});
+    formData.append('name', productData.name);
+    formData.append('price', productData.price.toString());
+    if (productData.originalPrice !== undefined) {
+      formData.append('originalPrice', productData.originalPrice.toString());
     }
+    if (productData.image) {
+      formData.append('imageUrl', productData.image);
+    }
+    if (productData.file) {
+      formData.append('file', productData.file);
+    }
+    formData.append('brand', productData.brand);
+    formData.append('description', productData.description);
+    formData.append('specifications', typeof productData.specifications === 'string' 
+      ? productData.specifications 
+      : JSON.stringify(productData.specifications || {}));
+    formData.append('stockQuantity', productData.stock.toString());
+    formData.append('rating', (productData.rating || 0).toString());
+    formData.append('reviewCount', (productData.reviews || 0).toString());
+    formData.append('isNew', (!!productData.isNew).toString());
+    formData.append('isBestSeller', (!!productData.isBestSeller).toString());
+    formData.append('categoryId', productData.categoryId.toString());
+
+    console.log(formData);
+    // const response = await http<ApiEnvelope<ApiProduct>>(`/api/Product/${id}`, {
+    //   method: 'PUT',
+    //   body: formData,
+    // });
     
-    // Create merged product with updates
-    const payload: ApiProduct = {
-      ...currentProduct,
-      ...(updates.name !== undefined ? { name: updates.name } : {}),
-      ...(updates.price !== undefined ? { price: updates.price } : {}),
-      ...(updates.originalPrice !== undefined ? { originalPrice: updates.originalPrice } : {}),
-      ...(updates.image !== undefined ? { imageUrl: updates.image } : {}),
-      ...(updates.brand !== undefined ? { brand: updates.brand } : {}),
-      ...(updates.description !== undefined ? { description: updates.description } : {}),
-      ...(updates.stock !== undefined ? { stockQuantity: updates.stock } : {}),
-      ...(updates.rating !== undefined ? { rating: updates.rating } : {}),
-      ...(updates.reviews !== undefined ? { reviewCount: updates.reviews } : {}),
-      ...(updates.isNew !== undefined ? { isNew: updates.isNew } : {}),
-      ...(updates.isBestSeller !== undefined ? { isBestSeller: updates.isBestSeller } : {}),
-      ...(updates.categoryId !== undefined ? { categoryId: updates.categoryId } : {}),
-      specifications
-    };
-    
-    const response = await http<ApiEnvelope<ApiProduct>>(`/api/Product/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(payload),
-    });
-    
-    return mapApiProduct(response.data);
+    // console.log(response);
+    return true;
   },
 
   // Delete a product by ID

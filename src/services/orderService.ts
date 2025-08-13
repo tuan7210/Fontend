@@ -1,4 +1,4 @@
-import { Order, CartItem } from '../types';
+import { Order, CartItem, ApiResponse, PaginatedResponse } from '../types';
 
 // API URL configuration
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5032';
@@ -123,27 +123,22 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (token) {
       try {
         const tokenPayload = JSON.parse(atob(token.split('.')[1]));
-        console.log('JWT Token payload:', tokenPayload);
         
         // Check if token is expired
         const now = Math.floor(Date.now() / 1000);
         if (tokenPayload.exp && tokenPayload.exp < now) {
-          console.warn('Token is expired! Removing token...');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
           window.location.href = '/login';
           throw new Error('Token expired, please login again');
         } else {
-          console.log('Token is valid, expires at:', new Date(tokenPayload.exp * 1000));
         }
       } catch (e) {
-        console.error('Could not decode token:', e);
-        console.log('Removing invalid token...');
+        
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
     } else {
-      console.log('No token found in localStorage');
     }
     
     const headers: HeadersInit = {
@@ -155,12 +150,9 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
     };
     
     const url = `${API_URL}${path}`;
-    console.log(`API Request: ${options.method || 'GET'} ${url}`);
     
     // Debug: Log request body if present
     if (options.body) {
-      console.log('Request body:', options.body);
-      console.log('Request headers:', headers);
     }
     
     const response = await fetch(url, { ...options, headers });
@@ -168,31 +160,17 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
     if (!response.ok) {
       let errorMessage = `API request failed (Status: ${response.status})`;
       try {
-        const errorData = await response.json();
-        console.error('API Error Details:', { 
-          url, 
-          method: options.method, 
-          status: response.status,
-          requestBody: options.body,
-          response: errorData 
-        });
+        const errorData = await response.json();        
         errorMessage = errorData.message || errorData.error || response.statusText;
       } catch (e) {
-        // Error parsing JSON, use status text
-        console.error('API Error (non-JSON):', { 
-          url, 
-          method: options.method,
-          status: response.status,
-          requestBody: options.body
-        });
         try {
           const text = await response.text();
           if (text) {
             errorMessage = text;
-            console.error('Error response text:', text);
+            
           }
         } catch (textError) {
-          console.error('Failed to get error text:', textError);
+          
         }
       }
       throw new Error(`${errorMessage} (Status: ${response.status})`);
@@ -205,7 +183,7 @@ async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
     
     return await response.json();
   } catch (error) {
-    console.error('API Request failed:', error);
+    
     throw error;
   }
 }
@@ -247,7 +225,7 @@ const getOrdersFromStorage = (): Order[] => {
     try {
       return JSON.parse(savedOrders);
     } catch (error) {
-      console.error('Error parsing orders from localStorage:', error);
+      
     }
   }
   return [];
@@ -263,42 +241,23 @@ const getSavedOrders = (): Order[] => {
 };
 
 export const orderService = {
-  async getOrders() {
-    try {
-      const response = await http<Order[]>('/api/OrderTable');
-      // Cập nhật localStorage nếu API thành công
-      saveOrdersToStorage(response);
-      return response;
-    } catch (error) {
-      console.error('Failed to fetch orders:', error);
-      // Fallback to localStorage or mock data
-      return getSavedOrders();
-    }
+  async getOrders(searchText?: string) {
+    var url = '/api/OrderTable';
+    if (searchText) url += `?searchText=${searchText}`
+    const response = await http<ApiResponse<PaginatedResponse<OrderResponse>>>(url);
+      if (response.success){
+        return response.data?.items;
+      }
+      return [];
   },
 
-  async getOrderById(id: string): Promise<Order | null> {
-    console.log(`Looking for order with ID: ${id}`);
-    
-    try {
-      return await http<Order>(`/api/OrderTable/${id}`);
-    } catch (error) {
-      console.error(`Failed to fetch order ${id} from API:`, error);
-      
-      // Fallback to localStorage
-      const savedOrders = getSavedOrders();
-      console.log(`Found ${savedOrders.length} orders in localStorage`);
-      console.log('Available order IDs:', savedOrders.map(o => o.id));
-      
-      const foundOrder = savedOrders.find(o => o.id === id);
-      
-      if (!foundOrder) {
-        console.warn(`Order with ID ${id} not found in local storage either`);
-        return null;
-      }
-      
-      console.log(`Found order ${id} in local storage`);
-      return foundOrder;
+  async getOrderById(id: string | number): Promise<OrderResponse> {
+    const url = `/api/OrderTable/${id}`;
+    const response  = await http<ApiResponse<OrderResponse>>(url);
+    if (response.success) {
+      return response.data as OrderResponse;
     }
+    throw new Error(response.message);
   },
 
   async getUserOrders(userId?: string) {
@@ -320,7 +279,7 @@ export const orderService = {
       // Gọi API với ID người dùng cụ thể
       return await http<Order[]>(`/api/OrderTable/customer/${userIdToUse}`);
     } catch (error) {
-      console.error(`Failed to fetch user orders:`, error);
+      
       // Fallback to localStorage or mock data
       const savedOrders = getSavedOrders();
       return savedOrders.filter(o => {
@@ -346,7 +305,6 @@ export const orderService = {
         }))
       };
       
-      console.log('Sending order payload:', payload);
       
       // Real API call to create order and update stock
       const response = await http<OrderResponse>('/api/Order', {
@@ -354,7 +312,6 @@ export const orderService = {
         body: JSON.stringify(payload),
       });
       
-      console.log('Order created successfully:', response);
       
       // Đơn hàng thành công - cập nhật số lượng tồn kho ở phía client
       if (response && response.id) {
@@ -366,7 +323,7 @@ export const orderService = {
             const user = JSON.parse(userData);
             userId = user.userId?.toString() || user.email || '1';
           } catch (e) {
-            console.warn('Could not parse user data');
+            
           }
         }
         
@@ -396,7 +353,7 @@ export const orderService = {
       
       return response;
     } catch (error) {
-      console.error('Failed to create order:', error);
+      
       
       // Fallback: Tạo đơn hàng giả để ứng dụng có thể tiếp tục hoạt động
       const mockOrderId = 'local-' + Date.now();
@@ -411,7 +368,7 @@ export const orderService = {
           const user = JSON.parse(userData);
           userId = user.userId?.toString() || user.email || '1';
         } catch (e) {
-          console.warn('Could not parse user data');
+          
         }
       }
       
@@ -457,56 +414,28 @@ export const orderService = {
           };
         }),
         createdAt: createdAt,
-        message: 'Đơn hàng được tạo trong chế độ ngoại tuyến. Bạn có thể theo dõi trạng thái đơn hàng trong mục quản lý đơn hàng.'
+        message: 'Đơn hàng được tạo trong chế độ ngoại tuyến. Bạn có thể theo dõi trạng thái đơn hàng trong mục quản lý đơn hàng.',
+        success: false
       };
       
-      console.warn('Using mock order due to API failure');
+      
       return mockOrderResponse;
     }
   },
   
   // Phương thức bổ sung để lưu đơn hàng mới vào localStorage
   saveNewOrder(order: Order) {
-    console.log('Saving new order:', order.id);
     const savedOrders = getSavedOrders();
-    console.log('Current saved orders count:', savedOrders.length);
     savedOrders.unshift(order); // Thêm đơn hàng mới vào đầu danh sách
     saveOrdersToStorage(savedOrders);
-    console.log('Order saved. New total count:', savedOrders.length);
   },
 
-  async updateOrderStatus(id: string, status: Order['status']) {
-    try {
-      const response = await http<Order>(`/api/OrderTable/${id}/status`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status }),
-      });
-      
-      // Cập nhật localStorage nếu API thành công
-      const savedOrders = getSavedOrders();
-      const updatedOrders = savedOrders.map(order => 
-        order.id === id ? {...order, status, updatedAt: new Date().toISOString()} : order
-      );
-      saveOrdersToStorage(updatedOrders);
-      
-      return response;
-    } catch (error) {
-      console.error(`Failed to update order status:`, error);
-      
-      // Fallback: Cập nhật trạng thái trong localStorage
-      const savedOrders = getSavedOrders();
-      const orderIndex = savedOrders.findIndex(o => o.id === id);
-      
-      if (orderIndex !== -1) {
-        savedOrders[orderIndex] = {
-          ...savedOrders[orderIndex],
-          status,
-          updatedAt: new Date().toISOString(),
-        };
-        saveOrdersToStorage(savedOrders);
-        return savedOrders[orderIndex];
-      }
-      return null;
+  async updateOrderStatus(id: number, status: OrderResponse['status']) {
+    const response = await http<ApiResponse<OrderResponse>>(`/api/OrderTable/${id}/${status}`, {
+      method: 'PATCH',
+    });
+    if (!response.success) {
+      throw new Error(response.message);
     }
   }
 };
