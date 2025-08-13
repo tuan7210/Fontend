@@ -88,8 +88,7 @@ const Home: React.FC = () => {
       
       // Hiển thị thông báo thành công ngắn gọn
       const toast = document.createElement('div');
-      toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg z-50 transition-all';
-      toast.textContent = 'Dữ liệu đã được cập nhật!';
+      
       document.body.appendChild(toast);
       
       setTimeout(() => {
