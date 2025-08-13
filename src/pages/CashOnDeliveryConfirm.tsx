@@ -93,7 +93,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
       // Gọi API để đặt hàng và cập nhật tồn kho
       const response = await orderService.createOrder(orderRequest);
       
-      if (response) {
+      if (response.success) {
         // Clear checkout items from localStorage
         localStorage.removeItem('checkoutItems');
         localStorage.removeItem('checkoutTotal');

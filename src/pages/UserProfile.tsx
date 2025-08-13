@@ -250,6 +250,7 @@ const UserProfile: React.FC = () => {
       const me = await getCurrentCustomer();
       setProfile(prev => {
         if (!prev) return null;
+        debugger;
         return {
           ...prev,
           name: me.name || prev.name,
@@ -306,7 +307,7 @@ const UserProfile: React.FC = () => {
         )}
         <div className="flex flex-col items-center mb-6">
           <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-3xl font-bold text-blue-600 mb-2">
-            {profile.name ? profile.name.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
+            {profile.name ? 'profile.name.charAt(0).toUpperCase()' : 'profile.email.charAt(0).toUpperCase()'}
           </div>
           <div className="text-lg font-semibold text-gray-800">{profile.name}</div>
           <div className="text-sm text-gray-500">{profile.email}</div>

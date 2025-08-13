@@ -232,6 +232,7 @@ export interface OrderResponse {
   }>;
   createdAt: string;
   message?: string;
+  success: boolean;
 }
 
 // Hàm để lưu đơn hàng vào localStorage

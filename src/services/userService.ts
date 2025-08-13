@@ -154,8 +154,9 @@ export async function getCurrentCustomer(): Promise<Customer> {
     // Đầu tiên, kiểm tra xem người dùng đã đăng nhập chưa
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
+    const userInfo = localStorage.getItem('userInfo');
     
-    if (!token || !userData) {
+    if (!token || !userInfo) {
       console.warn('Người dùng chưa đăng nhập (không có token hoặc user data)');
       throw new Error('Người dùng chưa đăng nhập');
     }
@@ -163,7 +164,7 @@ export async function getCurrentCustomer(): Promise<Customer> {
     // Parse thông tin user từ localStorage
     let user;
     try {
-      user = JSON.parse(userData);
+      user = JSON.parse(userInfo);
     } catch (e) {
       console.error('Không thể parse dữ liệu user từ localStorage:', e);
       throw new Error('Dữ liệu người dùng không hợp lệ');
@@ -172,7 +173,7 @@ export async function getCurrentCustomer(): Promise<Customer> {
     // Thử gọi API endpoint /api/Customer/me trước
     try {
       console.log('Đang gọi API endpoint /api/Customer/me...');
-      const resp = await http<ApiCustomer>(`/api/Customer/me`);
+      const resp = await http<ApiCustomer>(`/api/Customer/${user.id}`);
       if (resp.data) {
         console.log('Đã lấy thông tin người dùng từ /api/Customer/me');
         return mapApiCustomer(resp.data as ApiCustomer);

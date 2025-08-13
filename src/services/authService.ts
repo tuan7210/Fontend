@@ -24,6 +24,7 @@ export const authService = {
         // Lưu token
         localStorage.setItem('token', data.token);
         localStorage.setItem('role', data.role);
+        localStorage.setItem('userInfo', JSON.stringify(data));
         
         // Đảm bảo có đủ thông tin người dùng
         if (!data.userId) {
@@ -31,7 +32,7 @@ export const authService = {
           
           try {
             // Gọi API để lấy thông tin chi tiết người dùng
-            const userResponse = await fetch('http://localhost:5032/api/Customer/me', {
+            const userResponse = await fetch(`http://localhost:5032/api/Customer/${data.id}`, {
               headers: {
                 'Authorization': `Bearer ${data.token}`,
                 'Accept': 'application/json'
