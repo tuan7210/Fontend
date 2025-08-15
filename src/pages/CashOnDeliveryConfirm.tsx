@@ -20,39 +20,46 @@ const CashOnDeliveryConfirm: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Load checkout items from localStorage if they exist
+  // Load checkout items and payment method from localStorage if they exist
   const [checkoutItems, setCheckoutItems] = useState(items);
+  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
   
   useEffect(() => {
     // Load user info if available
     if (user) {
-      const savedUser = localStorage.getItem('user');
-      if (savedUser) {
+      // Ưu tiên lấy từ userInfo nếu có (có phone, address)
+      const savedUserInfo = localStorage.getItem('userInfo');
+      if (savedUserInfo) {
         try {
-          const userData = JSON.parse(savedUser);
-          setName(userData.name || '');
-        } catch (e) {
-        }
+          const userInfo = JSON.parse(savedUserInfo);
+          setName(userInfo.name || '');
+          setPhone(userInfo.phone || '');
+          setAddress(userInfo.address || '');
+        } catch (e) {}
+      } else {
+        // Fallback: chỉ lấy name từ user context
+        setName(user.name || '');
       }
     }
-    
     // Load stored items
     const storedItems = localStorage.getItem('checkoutItems');
     if (storedItems) {
       try {
         setCheckoutItems(JSON.parse(storedItems));
-      } catch (e) {
-      }
+      } catch (e) {}
+    }
+    // Load payment method
+    const storedPaymentMethod = localStorage.getItem('paymentMethod');
+    if (storedPaymentMethod === 'online' || storedPaymentMethod === 'cod') {
+      setPaymentMethod(storedPaymentMethod);
     }
   }, [user]);
 
   const handleConfirm = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     try {
       setIsProcessing(true);
       setError(null);
-      
       // Check authentication first
       const token = localStorage.getItem('token');
       if (!token) {
@@ -61,60 +68,74 @@ const CashOnDeliveryConfirm: React.FC = () => {
         setTimeout(() => navigate('/login'), 2000);
         return;
       }
-      
       // Validate form data
       if (!name.trim() || !phone.trim() || !address.trim()) {
         setError("Vui lòng điền đầy đủ thông tin");
         setIsProcessing(false);
         return;
       }
-      
       // Get items either from cart or from localStorage
       const orderItems = checkoutItems.length > 0 ? checkoutItems : items;
-      
       if (orderItems.length === 0) {
         setError("Không có sản phẩm nào trong đơn hàng");
         setIsProcessing(false);
         return;
       }
-      
-      // Create the order request (không cần userId - backend sẽ tự lấy từ JWT token)
+      if (paymentMethod === 'online') {
+        // Tạo đơn hàng online tại đây, sau đó chuyển sang trang checkout-online để hiển thị QR và thông tin
+        const orderRequest: CreateOrderRequest = {
+          items: orderItems.map(item => ({
+            productId: parseInt(item.product.id),
+            quantity: item.quantity
+          })),
+          shippingAddress: `${name}, ${phone}, ${address}, ${city}, ${zipCode}`,
+          paymentMethod: 'online'
+        };
+        const response = await orderService.createOrder(orderRequest);
+        // Lưu orderId vào localStorage để trang checkout-online có thể lấy lại nếu reload
+  localStorage.setItem('lastOrderId', String(response.orderId));
+        localStorage.removeItem('checkoutItems');
+        localStorage.removeItem('checkoutTotal');
+        // Chuyển sang trang checkout-online, truyền orderId và info để hiển thị QR
+        navigate('/checkout-online', {
+          state: {
+            orderId: response.orderId,
+            name,
+            phone,
+            address,
+            items: orderItems,
+            total: response.totalAmount || getTotalPrice() * 1.08
+          }
+        });
+        return;
+      }
+      // Nếu là COD thì giữ nguyên logic đặt hàng
       const orderRequest: CreateOrderRequest = {
         items: orderItems.map(item => ({
-          productId: parseInt(item.product.id), // Convert string ID to number
+          productId: parseInt(item.product.id),
           quantity: item.quantity
         })),
         shippingAddress: `${name}, ${phone}, ${address}, ${city}, ${zipCode}`,
         paymentMethod: 'cash_on_delivery'
       };
-      
-      // Gọi API để đặt hàng và cập nhật tồn kho
       const response = await orderService.createOrder(orderRequest);
-      
-      if (response.success) {
-        // Clear checkout items from localStorage
-        localStorage.removeItem('checkoutItems');
-        localStorage.removeItem('checkoutTotal');
-        
-        // Xóa giỏ hàng sau khi đặt hàng thành công
-        await handleOrderSuccess(orderItems);
-        
-        setConfirmed(true);
-        
-        // Navigate to order confirmation page
-        setTimeout(() => {
-          navigate('/cash-on-delivery-info', {
-            state: {
-              name,
-              phone,
-              address,
-              items: orderItems,
-              total: response.total || getTotalPrice() * 1.08,
-              orderId: response.id
-            }
-          });
-        }, 1800);
-      }
+      // Đơn hàng tạo thành công nếu không có lỗi
+      localStorage.removeItem('checkoutItems');
+      localStorage.removeItem('checkoutTotal');
+      await handleOrderSuccess(orderItems);
+      setConfirmed(true);
+      setTimeout(() => {
+        navigate('/cash-on-delivery-info', {
+          state: {
+            name,
+            phone,
+            address,
+            items: orderItems,
+            total: response.totalAmount || getTotalPrice() * 1.08,
+            orderId: response.orderId
+          }
+        });
+      }, 1800);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra khi đặt hàng");
       setConfirmed(false);

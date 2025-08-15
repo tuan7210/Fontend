@@ -1,3 +1,28 @@
+// DTO cho review trả về từ API product review
+export interface ProductReviewItemDto {
+  reviewId: number;
+  userName: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
+export interface ProductReviewStatisticsDto {
+  totalReviews: number;
+  averageRating: number;
+  ratingDistribution: Record<string, number>;
+}
+
+export interface ProductReviewListResponse {
+  reviews: ProductReviewItemDto[];
+  statistics: ProductReviewStatisticsDto;
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
 const API_BASE_URL = 'http://localhost:5000/api';
 
 // Interfaces for Review Management
@@ -89,6 +114,55 @@ export interface ApiResponse<T> {
 }
 
 class ReviewService {
+
+  // Lấy danh sách review của sản phẩm (có phân trang, filter, sort)
+  async getProductReviews(params: {
+    productId: number;
+    page?: number;
+    pageSize?: number;
+    rating?: number;
+    sortBy?: 'createdAt' | 'rating';
+    sortOrder?: 'asc' | 'desc';
+  }): Promise<ProductReviewListResponse> {
+    const { productId, page = 1, pageSize = 10, rating, sortBy = 'createdAt', sortOrder = 'desc' } = params;
+    const url = new URL(`/api/ProductReview/product/${productId}`, 'http://localhost:5032');
+    url.searchParams.append('page', page.toString());
+    url.searchParams.append('pageSize', pageSize.toString());
+    if (rating) url.searchParams.append('rating', rating.toString());
+    if (sortBy) url.searchParams.append('sortBy', sortBy);
+    if (sortOrder) url.searchParams.append('sortOrder', sortOrder);
+    const token = localStorage.getItem('token');
+    const res = await fetch(url.toString(), {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      }
+    });
+    if (!res.ok) throw new Error('Không thể lấy danh sách đánh giá');
+    return await res.json();
+  }
+
+  // Tạo review mới cho sản phẩm (yêu cầu đăng nhập, chỉ khi đơn hàng đã giao thành công)
+  async createProductReview(data: {
+    productId: number;
+    orderItemId: number;
+    rating: number;
+    comment: string;
+  }): Promise<any> {
+    const token = localStorage.getItem('token');
+    const res = await fetch('http://localhost:5032/api/ProductReview', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify(data)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.message || 'Không thể tạo đánh giá');
+    return result;
+  }
   private getAuthHeaders() {
     const token = localStorage.getItem('token');
     return {

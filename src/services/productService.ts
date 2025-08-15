@@ -1,4 +1,5 @@
-import { Product } from '../types';
+
+  import { Product } from '../types';
 
 // Base API URL from env
 const API_URL = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5032';
@@ -62,12 +63,18 @@ function mapApiProduct(p: ApiProduct): Product {
       specs = p.specifications as Record<string, string>;
     }
   }
+
+  // Tạo URL ảnh chính xác từ API endpoint
+  const imageUrl = p.imageUrl 
+    ? `${API_URL}/api/Product/image/${p.imageUrl}`
+    : '';
+
   return {
     id: String(p.productId),
     name: p.name,
     price: p.price,
     originalPrice: p.originalPrice ?? undefined,
-    image: p.imageUrl,
+    image: imageUrl,
     category: CATEGORY_MAP_DB_TO_FE[p.categoryName] || p.categoryName,
     brand: p.brand,
     description: p.description,
@@ -91,6 +98,7 @@ function buildQuery(params: Record<string, any>) {
 
 async function http<T>(path: string, init?: RequestInit): Promise<T> {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  
   const res = await fetch(`${API_URL}${path}`, {
     headers: {
       'Content-Type': 'application/json',
@@ -117,6 +125,19 @@ async function http<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const productService = {
+
+  // Update product using FormData (PUT, multipart/form-data)
+  async updateProductFormData(id: string, formData: FormData): Promise<boolean> {
+    const response = await fetch(`http://localhost:5032/api/Product/${id}`, {
+      method: 'PUT',
+      body: formData,
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Cập nhật sản phẩm thất bại');
+    }
+    return true;
+  },
   // Get products with optional filters; default to first page with a generous size for current UI needs
   async getProducts(filters?: {
     search?: string;
@@ -133,7 +154,10 @@ export const productService = {
     pageNumber?: number;
     pageSize?: number;
   }): Promise<{ items: Product[]; totalCount: number; pageNumber: number; pageSize: number }> {
-    const query = buildQuery({ pageNumber: 1, pageSize: 10, sortBy: 'name', sortOrder: 'asc', ...(filters || {}) });
+    const params = { pageNumber: 1, pageSize: 10, sortBy: 'name', sortOrder: 'asc', ...(filters || {}) };
+    
+    const query = buildQuery(params);
+    
     const response = await http<ApiEnvelope<ApiPaged<ApiProduct>>>(`/api/Product?${query}`);
     
     return {
@@ -259,7 +283,7 @@ export const productService = {
     isNew?: boolean;
     isBestSeller?: boolean;
     categoryId: number;
-  }, id?: number): Promise<boolean> {
+  }): Promise<boolean> {
     // Create FormData for file upload support
     const formData = new FormData();
     

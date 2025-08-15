@@ -3,12 +3,14 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Search, ShoppingCart, User, Menu, X, Smartphone, Laptop, Tablet, Headphones } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useCart } from '../../context/CartContext';
+import { useReload } from '../../context/ReloadContext';
 
 const Header: React.FC = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { user, logout } = useAuth();
   const { getItemsCount } = useCart();
+  const { reload } = useReload();
   const navigate = useNavigate();
   const location = useLocation();
   const queryParams = new URLSearchParams(location.search);
@@ -34,7 +36,14 @@ const Header: React.FC = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/" className="flex items-center space-x-2"
+            onClick={e => {
+              if (location.pathname === '/') {
+                e.preventDefault();
+                reload();
+              }
+            }}
+          >
             <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
               <Smartphone className="w-6 h-6 text-white" />
             </div>
@@ -43,7 +52,14 @@ const Header: React.FC = () => {
 
           {/* Desktop Navigation */}
           <nav className="hidden lg:flex items-center space-x-8">
-            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors">
+            <Link to="/" className="text-gray-700 hover:text-blue-600 transition-colors"
+              onClick={e => {
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  reload();
+                }
+              }}
+            >
               Home
             </Link>
             <div className="relative group">
@@ -189,7 +205,13 @@ const Header: React.FC = () => {
             <Link
               to="/"
               className="block px-3 py-2 text-gray-700 hover:text-blue-600 hover:bg-gray-50 rounded-lg transition-colors"
-              onClick={() => setIsMenuOpen(false)}
+              onClick={e => {
+                setIsMenuOpen(false);
+                if (location.pathname === '/') {
+                  e.preventDefault();
+                  reload();
+                }
+              }}
             >
               Home
             </Link>

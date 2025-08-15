@@ -1,4 +1,21 @@
+// Lấy danh sách đơn hàng có phân trang
+export interface GetOrdersPagedParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}
+
+export interface OrdersPagedResponse {
+  data: OrderResponse[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
 import { Order, CartItem, ApiResponse, PaginatedResponse } from '../types';
+import type { OrderResponse } from '../types';
 
 // API URL configuration
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5032';
@@ -115,7 +132,7 @@ export const mockOrders: Order[] = [
 ];
 
 // Helper function for API calls
-async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function http<T>(path: string, options: RequestInit = {}): Promise<T> {
   try {
     const token = localStorage.getItem('token');
     
@@ -198,20 +215,7 @@ export interface CreateOrderRequest {
   paymentMethod: string;
 }
 
-export interface OrderResponse {
-  id: string;
-  status: Order['status'];
-  total: number;
-  items: Array<{
-    productId: number;
-    quantity: number;
-    price: number;
-    subtotal: number;
-  }>;
-  createdAt: string;
-  message?: string;
-  success: boolean;
-}
+
 
 // Hàm để lưu đơn hàng vào localStorage
 const saveOrdersToStorage = (orders: Order[]) => {
@@ -241,6 +245,21 @@ const getSavedOrders = (): Order[] => {
 };
 
 export const orderService = {
+  async getOrdersPaged(params: GetOrdersPagedParams) {
+    const { page = 1, pageSize = 10, search = '' } = params || {};
+    let url = `/api/Order?page=${page}&pageSize=${pageSize}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    const response = await http<any>(url);
+    return {
+      data: response.data || [],
+      pagination: response.pagination || {
+        page: 1,
+        pageSize: 10,
+        totalCount: 0,
+        totalPages: 1
+      }
+    };
+  },
   async getOrders(searchText?: string) {
     var url = '/api/OrderTable';
     if (searchText) url += `?searchText=${searchText}`
@@ -314,40 +333,34 @@ export const orderService = {
       
       
       // Đơn hàng thành công - cập nhật số lượng tồn kho ở phía client
-      if (response && response.id) {
+      if (response && response.orderId) {
         // Lấy userId từ localStorage để lưu đơn hàng
-        let userId = '1'; // fallback
+        let username = '';
         const userData = localStorage.getItem('user');
         if (userData) {
           try {
             const user = JSON.parse(userData);
-            userId = user.userId?.toString() || user.email || '1';
-          } catch (e) {
-            
-          }
+            username = user.name || user.email || '';
+          } catch (e) {}
         }
-        
-        // Tạo shippingAddress object từ string để lưu vào localStorage
-        const shippingAddressObj = {
-          firstName: 'N/A',
-          lastName: 'N/A', 
-          email: cartItems.length > 0 ? cartItems[0].product.brand : '',
-          phone: 'N/A',
-          address: orderData.shippingAddress,
-          city: 'N/A',
-          zipCode: 'N/A'
-        };
-        
-        // Lưu đơn hàng mới vào localStorage
+        // Lưu đơn hàng mới vào localStorage (as Order, not OrderResponse)
         this.saveNewOrder({
-          id: response.id,
-          userId: userId,
+          id: response.orderId.toString(),
+          userId: username,
           items: cartItems,
-          total: response.total || cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-          status: 'pending',
-          shippingAddress: shippingAddressObj,
-          createdAt: response.createdAt || new Date().toISOString(),
-          updatedAt: response.createdAt || new Date().toISOString()
+          total: response.totalAmount || cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+          status: response.status as 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled',
+          shippingAddress: {
+            firstName: 'N/A',
+            lastName: 'N/A',
+            email: username,
+            phone: 'N/A',
+            address: orderData.shippingAddress,
+            city: 'N/A',
+            zipCode: 'N/A'
+          },
+          createdAt: response.orderDate ? new Date(response.orderDate).toISOString() : new Date().toISOString(),
+          updatedAt: response.orderDate ? new Date(response.orderDate).toISOString() : new Date().toISOString()
         });
       }
       
@@ -398,27 +411,33 @@ export const orderService = {
       // Lưu đơn hàng mới vào localStorage
       this.saveNewOrder(newOrder);
       
-      // Tạo response để trả về cho người gọi
+      // Tạo response để trả về cho người gọi (OrderResponse)
       const mockOrderResponse: OrderResponse = {
-        id: mockOrderId,
+        orderId: Number(mockOrderId),
+        userId: 1,
+        username: 'Offline User',
+        orderDate: new Date(createdAt),
         status: 'pending',
-        total: total,
-        items: orderData.items.map(item => {
+        totalAmount: total,
+        paymentStatus: 'pending',
+        paymentMethod: orderData.paymentMethod || 'cash_on_delivery',
+        shippingAddress: orderData.shippingAddress,
+        items: orderData.items.map((item, idx) => {
           const matchingItem = cartItems.find(i => parseInt(i.product.id) === item.productId);
           const price = matchingItem ? matchingItem.product.price : 0;
           return {
+            orderItemId: idx + 1,
             productId: item.productId,
+            productName: matchingItem ? matchingItem.product.name : '',
+            imageUrl: matchingItem ? matchingItem.product.image : '',
             quantity: item.quantity,
             price: price,
             subtotal: price * item.quantity
           };
         }),
-        createdAt: createdAt,
-        message: 'Đơn hàng được tạo trong chế độ ngoại tuyến. Bạn có thể theo dõi trạng thái đơn hàng trong mục quản lý đơn hàng.',
-        success: false
+        email: '',
+        phone: ''
       };
-      
-      
       return mockOrderResponse;
     }
   },
@@ -437,5 +456,15 @@ export const orderService = {
     if (!response.success) {
       throw new Error(response.message);
     }
+  },
+
+  async confirmPayment(orderId: number) {
+    const response = await http<ApiResponse<any>>(`/api/Order/${orderId}/confirm-payment`, {
+      method: 'PUT',
+    });
+    if (!response.success) {
+      throw new Error(response.message || 'Xác nhận thanh toán thất bại');
+    }
+    return response.data;
   }
 };

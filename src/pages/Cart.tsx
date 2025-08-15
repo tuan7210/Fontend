@@ -27,20 +27,15 @@ const Cart: React.FC = () => {
       navigate('/login?redirect=/checkout');
       return;
     }
-    
     try {
       setIsProcessing(true);
       setError(null);
-      
-      // Continue with checkout process based on payment method
-      if (paymentMethod === 'cod') {
-        // Store cart items in localStorage for the next page
-        localStorage.setItem('checkoutItems', JSON.stringify(items));
-        localStorage.setItem('checkoutTotal', String(getTotalPrice() * 1.08));
-        navigate('/cash-on-delivery-confirm');
-      } else {
-        navigate(`/checkout?method=online`);
-      }
+      // Store cart items and payment method in localStorage for the next page
+      localStorage.setItem('checkoutItems', JSON.stringify(items));
+      localStorage.setItem('checkoutTotal', String(getTotalPrice() * 1.08));
+      localStorage.setItem('paymentMethod', paymentMethod);
+      // Always go to confirm page first
+      navigate('/cash-on-delivery-confirm');
     } catch (error) {
       setError(typeof error === 'string' ? error : 
         error instanceof Error ? error.message : 'Đã có lỗi xảy ra khi xử lý đơn hàng');

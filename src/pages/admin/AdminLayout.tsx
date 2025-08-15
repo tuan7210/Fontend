@@ -9,7 +9,8 @@ import {
   LogOut, 
   Menu, 
   X,
-  Smartphone
+  Smartphone,
+  Star
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import Button from '../../components/UI/Button';
@@ -26,11 +27,12 @@ const AdminLayout: React.FC = () => {
   };
 
   const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
-    { icon: Package, label: 'Kho hàng', path: '/admin/products' },
-    { icon: ShoppingCart, label: 'Orders', path: '/admin/orders' },
-    { icon: Users, label: 'Users', path: '/admin/users' },
-    { icon: Settings, label: 'Settings', path: '/admin/settings' },
+  { icon: LayoutDashboard, label: 'Dashboard', path: '/admin' },
+  { icon: Package, label: 'Kho hàng', path: '/admin/products' },
+  { icon: ShoppingCart, label: 'Orders', path: '/admin/orders' },
+  { icon: Users, label: 'Users', path: '/admin/users' },
+  { icon: Star, label: 'Đánh giá', path: '/admin/reviews' },
+  { icon: Settings, label: 'Settings', path: '/admin/settings' },
   ];
 
   return (

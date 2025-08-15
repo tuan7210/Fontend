@@ -12,11 +12,24 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct }) => {
   const { addItem } = useCart();
   const navigate = useNavigate();
+
+  // Xử lý mua ngay: thêm vào giỏ và chuyển hướng đến cart
+  const handleBuyNow = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const result = addItem(product);
+    if (result === false) {
+      navigate('/login');
+    } else {
+      navigate('/cart');
+    }
+  };
   const [product, setProduct] = useState(initialProduct);
+  const [imageError, setImageError] = useState(false);
   
   // Update product when initialProduct changes
   useEffect(() => {
     setProduct(initialProduct);
+    setImageError(false);
   }, [initialProduct]);
 
   const handleAddToCart = (e: React.MouseEvent) => {
@@ -28,14 +41,40 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct }) =>
     }
   };
 
+  // Add cache busting to image URL to ensure fresh images
+  const getImageUrlWithCacheBuster = (imageUrl: string) => {
+    if (!imageUrl) return '';
+    if (imageUrl.startsWith('data:')) return imageUrl; // Base64 images don't need cache busting
+    
+    const separator = imageUrl.includes('?') ? '&' : '?';
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return `${imageUrl}${separator}t=${timestamp}&r=${random}&nocache=true`;
+  };
+
+  const handleImageError = () => {
+    console.log(`Image failed to load for product ${product.name}:`, product.image);
+    setImageError(true);
+  };
+
+  const handleImageLoad = () => {
+    console.log(`Image loaded successfully for product ${product.name}:`, product.image);
+    setImageError(false);
+  };
+
+  const fallbackImage = 'https://via.placeholder.com/300x200/e2e8f0/64748b?text=No+Image';
+  const displayImage = imageError ? fallbackImage : getImageUrlWithCacheBuster(product.image || fallbackImage);
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow duration-300 group">
       <Link to={`/product/${product.id}`}>
         <div className="relative">
           <img
-            src={product.image}
+            src={displayImage}
             alt={product.name}
             className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={handleImageError}
+            onLoad={handleImageLoad}
           />
           {product.isNew && (
             <span className="absolute top-2 left-2 bg-green-500 text-white px-2 py-1 rounded text-xs font-medium">
@@ -87,14 +126,23 @@ const ProductCard: React.FC<ProductCardProps> = ({ product: initialProduct }) =>
           </span>
         </div>
         
-        <Button
-          onClick={handleAddToCart}
-          className="w-full"
-          disabled={product.stock === 0}
-        >
-          <ShoppingCart className="w-4 h-4 mr-2" />
-          {product.stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={handleAddToCart}
+            className="w-1/2 min-w-[90px] px-2"
+            disabled={product.stock === 0}
+          >
+            <ShoppingCart className="w-4 h-4 mr-2" />
+            {product.stock > 0 ? 'Thêm vào giỏ' : 'Hết hàng'}
+          </Button>
+          <Button
+            className="w-1/2 min-w-[90px] px-2 bg-green-500 hover:bg-green-600 text-white font-semibold border-2 border-green-600 shadow-md"
+            onClick={handleBuyNow}
+            disabled={product.stock === 0}
+          >
+            Mua ngay
+          </Button>
+        </div>
       </div>
     </div>
   );

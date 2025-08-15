@@ -301,7 +301,7 @@ const AdminProducts: React.FC = () => {
   // Xử lý lưu sản phẩm
   const handleSaveProduct = async () => {
     if (!editingProduct) return;
-    
+    debugger;
     setSaving(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -314,73 +314,62 @@ const AdminProducts: React.FC = () => {
           specs[key.trim()] = specificationValues[index] || '';
         }
       });
-      
-      // Cập nhật specifications trong editingProduct
-      const updatedProduct = {
-        ...editingProduct,
-        specifications: JSON.stringify(specs)
-      };
-      
+
+      // Chuẩn bị FormData cho update (PUT)
+      const formData = new FormData();
+      if (modalMode === 'edit') {
+        formData.append('productId', editingProduct.productId);
+      }
+      formData.append('name', editingProduct.name);
+      formData.append('description', editingProduct.description);
+      formData.append('price', editingProduct.price);
+      formData.append('originalPrice', editingProduct.originalPrice || 0);
+      formData.append('brand', editingProduct.brand);
+      formData.append('stockQuantity', editingProduct.stockQuantity);
+      formData.append('categoryId', editingProduct.categoryId);
+      formData.append('specifications', JSON.stringify(specs));
+      formData.append('isNew', editingProduct.isNew ? 'true' : 'false');
+      formData.append('isBestSeller', editingProduct.isBestSeller ? 'true' : 'false');
+      if (editingProduct.file) {
+        formData.append('file', editingProduct.file);
+      }
+      if (editingProduct.imageUrl && !editingProduct.file) {
+        formData.append('imageUrl', editingProduct.imageUrl);
+      }
+
       if (modalMode === 'create') {
-        // Gọi API tạo sản phẩm mới
+        // Gọi API tạo sản phẩm mới (giữ nguyên logic cũ)
         await productService.createProduct({
-          name: updatedProduct.name,
-          description: updatedProduct.description,
-          price: Number(updatedProduct.price),
-          originalPrice: Number(updatedProduct.originalPrice || 0),
-          brand: updatedProduct.brand,
-          stock: Number(updatedProduct.stockQuantity),
-          categoryId: Number(updatedProduct.categoryId),
-          image: updatedProduct.imageUrl,
+          name: editingProduct.name,
+          description: editingProduct.description,
+          price: Number(editingProduct.price),
+          originalPrice: Number(editingProduct.originalPrice || 0),
+          brand: editingProduct.brand,
+          stock: Number(editingProduct.stockQuantity),
+          categoryId: Number(editingProduct.categoryId),
+          image: editingProduct.imageUrl,
           specifications: specs,
-          isNew: updatedProduct.isNew,
-          isBestSeller: updatedProduct.isBestSeller,
-          file: updatedProduct.file
+          isNew: editingProduct.isNew,
+          isBestSeller: editingProduct.isBestSeller,
+          file: editingProduct.file
         });
-        
         setSuccessMsg('Tạo sản phẩm mới thành công!');
       } else {
-        // Gọi API cập nhật sản phẩm
-        await productService.updateProduct(String(updatedProduct.productId), {
-          name: updatedProduct.name,
-          description: updatedProduct.description,
-          price: Number(updatedProduct.price),
-          originalPrice: Number(updatedProduct.originalPrice || 0),
-          brand: updatedProduct.brand,
-          stock: Number(updatedProduct.stockQuantity),
-          categoryId: Number(updatedProduct.categoryId),
-          image: updatedProduct.imageUrl,
-          specifications: specs,
-          isNew: updatedProduct.isNew,
-          isBestSeller: updatedProduct.isBestSeller,
-          file: updatedProduct.file
-        });
-        
+        // Gọi API cập nhật sản phẩm (PUT multipart/form-data)
+        await productService.updateProductFormData(String(editingProduct.productId), formData);
         // Notify stockManager về stock update
-        stockManager.updateStockAndNotify(String(updatedProduct.productId), Number(updatedProduct.stockQuantity));
-        
-        // Lưu vào localStorage để persist data
-        try {
-          const localUpdates = JSON.parse(localStorage.getItem('stockUpdates') || '{}');
-          localUpdates[String(updatedProduct.productId)] = {
-            stock: Number(updatedProduct.stockQuantity),
-            timestamp: Date.now()
-          };
-          localStorage.setItem('stockUpdates', JSON.stringify(localUpdates));
-        } catch (error) {
-        }
-        
+        stockManager.updateStockAndNotify(String(editingProduct.productId), Number(editingProduct.stockQuantity));
         setSuccessMsg('Cập nhật sản phẩm thành công!');
       }
-      
+
       // Reload sản phẩm sau khi tạo/cập nhật
       await loadProducts();
-      
+
       // Đóng modal sau khi hiển thị thông báo thành công
       setTimeout(() => {
         setShowModal(false);
       }, 1000);
-      
+
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : 'Không thể lưu sản phẩm. Vui lòng thử lại sau.');
     } finally {
@@ -973,7 +962,12 @@ const AdminProducts: React.FC = () => {
                 {(previewUrl || editingProduct?.imageUrl) && (
                   <div className="mt-2 p-2 border rounded-lg">
                     <img
-                      src={previewUrl || `http://localhost:9981/${editingProduct?.imageUrl}`}
+                      src={
+                        previewUrl ||
+                        (editingProduct?.imageUrl && editingProduct.imageUrl.match(/^https?:\/\//)
+                          ? editingProduct.imageUrl
+                          : editingProduct?.imageUrl)
+                      }
                       alt="Xem trước"
                       className="h-40 object-contain mx-auto"
                       onError={(e) => {

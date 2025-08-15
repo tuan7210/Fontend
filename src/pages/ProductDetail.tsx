@@ -5,8 +5,6 @@ import { Product } from '../types';
 import { productService } from '../services/productService';
 import { stockManager } from '../utils/stockManager';
 import { useCart } from '../context/CartContext';
-// ...existing code...
-// ...existing code...
 import ProductCard from '../components/Product/ProductCard';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Button from '../components/UI/Button';
@@ -22,44 +20,53 @@ const ProductDetail: React.FC = () => {
   const [quantity, setQuantity] = useState(1);
   const [isStockUpdating, setIsStockUpdating] = useState(false);
   
-  // State cho phần bình luận và đánh giá
+  // State cho phần bình luận và đánh giá (lấy từ backend)
   const [reviews, setReviews] = useState<Array<{
-    user: string;
+    userName: string;
     rating: number;
     comment: string;
-    date: string;
-    productId: string;
+    createdAt: string;
   }>>([]);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [averageRating, setAverageRating] = useState(0);
 
   useEffect(() => {
     const fetchProduct = async () => {
       if (!id) return;
-      
       setIsStockUpdating(true);
-      
       try {
         // Lấy thông tin chi tiết sản phẩm
         const productData = await productService.getProductById(id);
-        
         if (productData) {
           // Lấy thông tin tồn kho mới nhất từ server
           const updatedStock = await stockManager.syncWithServer(id);
-          
-          // Cập nhật số lượng tồn kho nếu có thông tin mới
           if (updatedStock !== null) {
             productData.stock = updatedStock;
           }
-          
           setProduct(productData);
-          
           // Lấy sản phẩm liên quan
           const related = await productService.getProductsByCategory(productData.category);
           setRelatedProducts(related.filter(p => p.id !== id).slice(0, 4));
-          
-          // Lấy đánh giá từ localStorage
-          const savedReviews = localStorage.getItem(`reviews_${id}`);
-          if (savedReviews) {
-            setReviews(JSON.parse(savedReviews));
+        }
+        // Lấy đánh giá từ backend
+        if (id) {
+          const { reviewService } = await import('../services/reviewService');
+          const apiRes = await reviewService.getProductReviews({ productId: Number(id), page: 1, pageSize: 20 });
+          // Nếu response là { success, message, data: { reviews, statistics, ... } }
+          if (apiRes && 'data' in apiRes && apiRes.data) {
+            const { reviews = [], statistics = {} } = apiRes.data as any;
+            setReviews(Array.isArray(reviews) ? reviews.map((r: any) => ({
+              userName: r.userName,
+              rating: r.rating,
+              comment: r.comment,
+              createdAt: r.createdAt
+            })) : []);
+            setReviewCount(statistics?.totalReviews || 0);
+            setAverageRating(statistics?.averageRating || 0);
+          } else {
+            setReviews([]);
+            setReviewCount(0);
+            setAverageRating(0);
           }
         }
       } catch (error) {
@@ -70,7 +77,7 @@ const ProductDetail: React.FC = () => {
     };
 
     fetchProduct();
-    
+
     // Subscribe to real-time stock updates
     const unsubscribe = stockManager.subscribe((productId, newStock) => {
       if (productId === id) {
@@ -79,7 +86,7 @@ const ProductDetail: React.FC = () => {
         );
       }
     });
-    
+
     // Tự động làm mới thông tin tồn kho mỗi 60 giây
     const refreshInterval = setInterval(async () => {
       if (id && product) {
@@ -97,7 +104,7 @@ const ProductDetail: React.FC = () => {
         }
       }
     }, 60000);
-    
+
     return () => {
       unsubscribe();
       clearInterval(refreshInterval);
@@ -164,14 +171,15 @@ const ProductDetail: React.FC = () => {
                 )}
                 <span className="text-sm text-gray-600 bg-blue-50 px-3 py-1 rounded shadow">{product.category}</span>
               </div>
+              {/* Đánh giá trung bình và số lượng đánh giá từ backend */}
               <div className="flex items-center gap-3 mb-6">
                 <span className="flex items-center gap-1">
                   {[...Array(5)].map((_, i) => (
-                    <Star key={i} className={`w-6 h-6 ${i < Math.round(product.rating) ? 'text-yellow-400' : 'text-gray-300'}`} />
+                    <Star key={i} className={`w-6 h-6 ${i < Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-300'}`} />
                   ))}
                 </span>
-                <span className="text-lg text-gray-700 font-semibold">{product.rating.toFixed(1)} / 5</span>
-                <span className="text-base text-gray-500">({product.reviews} đánh giá)</span>
+                <span className="text-lg text-gray-700 font-semibold">{averageRating.toFixed(1)} / 5</span>
+                <span className="text-base text-gray-500">({reviewCount} đánh giá)</span>
               </div>
               <div className="mb-6 flex items-center gap-3">
                 <span className="font-semibold text-gray-700">Tình trạng kho:</span>
@@ -237,27 +245,42 @@ const ProductDetail: React.FC = () => {
                   )}
                 </span>
               </div>
-              
-              <Button 
-                onClick={() => {
-                  if (product.stock < quantity) {
-                    alert(`Chỉ còn ${product.stock} sản phẩm trong kho.`);
-                    return;
-                  }
-                  
-                  const success = addItem(product, quantity);
-                  if (success) {
-                    alert('Đã thêm sản phẩm vào giỏ hàng!');
-                  } else {
-                    navigate('/login');
-                  }
-                }}
-                className="w-full text-lg font-bold py-3 flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl shadow hover:bg-blue-700 transition"
-                disabled={product.stock === 0 || isStockUpdating}
-              >
-                <ShoppingCart size={20} />
-                {product.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ hàng'}
-              </Button>
+              <div className="flex flex-col md:flex-row gap-4">
+                <Button 
+                  onClick={() => {
+                    if (product.stock < quantity) {
+                      // Không cho thêm nếu vượt quá tồn kho, không hiện alert
+                      return;
+                    }
+                    const success = addItem(product, quantity);
+                    if (success) {
+                      alert('Đã thêm sản phẩm vào giỏ hàng!');
+                    } else {
+                      navigate('/login');
+                    }
+                  }}
+                  className="w-full text-lg font-bold py-3 flex items-center justify-center gap-2 bg-blue-600 text-white rounded-xl shadow hover:bg-blue-700 transition"
+                  disabled={product.stock === 0 || isStockUpdating}
+                >
+                  <ShoppingCart size={20} />
+                  {product.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ hàng'}
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (product.stock < quantity) return;
+                    const success = addItem(product, quantity);
+                    if (success) {
+                      navigate('/cart');
+                    } else {
+                      navigate('/login');
+                    }
+                  }}
+                  className="w-full text-lg font-bold py-3 flex items-center justify-center gap-2 bg-green-500 text-white rounded-xl shadow hover:bg-green-600 transition"
+                  disabled={product.stock === 0 || isStockUpdating}
+                >
+                  Mua ngay
+                </Button>
+              </div>
             </div>
           </div>
         </section>
@@ -288,13 +311,11 @@ const ProductDetail: React.FC = () => {
                 để đánh giá các sản phẩm đã mua.
               </p>
             </div>
-            
-            {/* Danh sách các bình luận */}
+            {/* Danh sách các bình luận từ backend */}
             <div>
               <h3 className="text-xl font-bold text-blue-700 mb-4">
-                {reviews.length > 0 ? `Bình luận (${reviews.length})` : 'Chưa có bình luận nào'}
+                {reviewCount > 0 ? `Bình luận (${reviewCount})` : 'Chưa có bình luận nào'}
               </h3>
-              
               {reviews.length > 0 ? (
                 <div className="space-y-6">
                   {reviews.map((review, index) => (
@@ -302,10 +323,10 @@ const ProductDetail: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-bold">
-                            {review.user.charAt(0).toUpperCase()}
+                            {review.userName.charAt(0).toUpperCase()}
                           </div>
                           <div>
-                            <h4 className="font-semibold text-gray-800">{review.user}</h4>
+                            <h4 className="font-semibold text-gray-800">{review.userName}</h4>
                             <div className="flex items-center">
                               <div className="flex">
                                 {[...Array(5)].map((_, i) => (
@@ -313,7 +334,7 @@ const ProductDetail: React.FC = () => {
                                 ))}
                               </div>
                               <span className="ml-2 text-sm text-gray-500">
-                                {new Date(review.date).toLocaleDateString('vi-VN')}
+                                {new Date(review.createdAt).toLocaleDateString('vi-VN')}
                               </span>
                             </div>
                           </div>

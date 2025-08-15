@@ -1,5 +1,7 @@
+
+
 import React, { useEffect, useState } from 'react';
-import { Order, OrderResponse } from '../../types';
+import { OrderResponse } from '../../types';
 import { ShoppingCart, Search, Eye, Truck, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { orderService } from '../../services/orderService';
 import Button from '../../components/UI/Button';
@@ -11,16 +13,25 @@ const AdminOrders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOrder, setSelectedOrder] = useState<OrderResponse | null>(null);
   const [updatingOrder, setUpdatingOrder] = useState<number | null>(null);
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
     fetchOrders();
-  }, []);
-  
+    // eslint-disable-next-line
+  }, [page, pageSize, search]);
+
   const fetchOrders = async () => {
     setLoading(true);
     try {
-      const data = await orderService.getOrders(search);
-      setOrders(data);
+      // Gọi API phân trang
+      const res = await orderService.getOrdersPaged({ page, pageSize, search });
+      setOrders(res.data || []);
+      setTotalCount(res.pagination?.totalCount || 0);
+      setTotalPages(res.pagination?.totalPages || 1);
     } catch (error) {
       // handle error
     } finally {
@@ -30,7 +41,8 @@ const AdminOrders: React.FC = () => {
 
   const handleUpdateStatus = async (orderId: number, newStatus: OrderResponse['status']) => {
     setUpdatingOrder(orderId);
-    await orderService.updateOrderStatus(orderId, newStatus);
+    // Đảm bảo newStatus là đúng union type
+    await orderService.updateOrderStatus(orderId, newStatus as any);
     setSelectedOrder(null);
     setUpdatingOrder(null);
     fetchOrders();
@@ -71,8 +83,24 @@ const AdminOrders: React.FC = () => {
 
   const onViewOrderDetail = async (order: OrderResponse) => {
     const orderDetail = await orderService.getOrderById(order.orderId);
-    setSelectedOrder(orderDetail);
+    setSelectedOrder(orderDetail as OrderResponse);
   }
+
+  // Xác nhận đã thanh toán
+  const handleConfirmPayment = async (orderId: number) => {
+    setUpdatingOrder(orderId);
+    try {
+      await orderService.confirmPayment(orderId);
+      // Sau khi xác nhận, reload lại chi tiết đơn hàng
+      const updatedOrder = await orderService.getOrderById(orderId);
+      setSelectedOrder(updatedOrder as OrderResponse);
+      fetchOrders();
+    } catch (error) {
+      alert('Xác nhận thanh toán thất bại!');
+    } finally {
+      setUpdatingOrder(null);
+    }
+  };
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
@@ -87,12 +115,45 @@ const AdminOrders: React.FC = () => {
           <input
             type="text"
             value={search}
-            onChange={e => {setSearch(e.target.value); fetchOrders()}}
+            onChange={e => {setSearch(e.target.value); setPage(1);}}
             placeholder="Tìm kiếm tên khách hàng"
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
         </div>
+      {/* Pagination controls */}
+      <div className="flex justify-between items-center mt-4">
+        <div className="text-gray-600 text-sm">
+          Hiển thị {(page - 1) * pageSize + 1}
+          -{Math.min(page * pageSize, totalCount)} trên tổng {totalCount} đơn hàng
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="px-3 py-1 rounded border bg-white hover:bg-gray-100 disabled:opacity-50"
+            onClick={() => setPage(page - 1)}
+            disabled={page === 1}
+          >
+            Trước
+          </button>
+          <span className="mx-2">Trang {page} / {totalPages}</span>
+          <button
+            className="px-3 py-1 rounded border bg-white hover:bg-gray-100 disabled:opacity-50"
+            onClick={() => setPage(page + 1)}
+            disabled={page === totalPages}
+          >
+            Sau
+          </button>
+          <select
+            className="ml-4 border rounded px-2 py-1"
+            value={pageSize}
+            onChange={e => {setPageSize(Number(e.target.value)); setPage(1);}}
+          >
+            {[10, 20, 50].map(size => (
+              <option key={size} value={size}>{size} / trang</option>
+            ))}
+          </select>
+        </div>
+      </div>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full bg-white rounded-xl shadow-md">
@@ -227,7 +288,7 @@ const AdminOrders: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedOrder.items.map((item, index) => (
+                    {selectedOrder.items.map((item: any, index: number) => (
                       <tr key={index} className="border-t">
                         <td className="py-3 px-4 font-medium">{item.productName}</td>
                         <td className="py-3 px-4 text-center">
@@ -258,6 +319,17 @@ const AdminOrders: React.FC = () => {
             <div className="border-t pt-4 mt-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Cập nhật trạng thái đơn hàng</h3>
               <div className="flex flex-wrap gap-2">
+                {/* Nút xác nhận đã thanh toán */}
+                {selectedOrder.paymentStatus !== 'paid' && (
+                  <Button
+                    onClick={() => handleConfirmPayment(selectedOrder.orderId)}
+                    className="bg-indigo-500 hover:bg-indigo-600 flex items-center gap-1"
+                    disabled={updatingOrder === selectedOrder.orderId}
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Xác nhận đã thanh toán
+                  </Button>
+                )}
                 {selectedOrder.status !== 'pending' && (
                   <Button
                     onClick={() => handleUpdateStatus(selectedOrder.orderId, 'pending')}
@@ -330,6 +402,6 @@ const AdminOrders: React.FC = () => {
       )}
     </div>
   );
-};
+}
 
 export default AdminOrders;

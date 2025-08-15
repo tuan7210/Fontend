@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ArrowRight, Smartphone, TrendingUp, Star, X, Laptop, Tablet, Headphones, RefreshCw } from 'lucide-react';
+import { ArrowRight, Smartphone, TrendingUp, Star, X, Laptop, Tablet, Headphones } from 'lucide-react';
 import { Product } from '../types';
 import { productService } from '../services/productService';
 import ProductCard from '../components/Product/ProductCard';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Button from '../components/UI/Button';
+import { useReload } from '../context/ReloadContext';
 
 const Home: React.FC = () => {
   const location = useLocation();
@@ -28,11 +29,10 @@ const Home: React.FC = () => {
   const [isSearchActive, setIsSearchActive] = useState(!!searchFromURL || !!categoryFromURL); // Kích hoạt tìm kiếm nếu có tham số từ URL
   const [sortBy, setSortBy] = useState('popular'); // popular, newest, price-asc, price-desc
   const [error, setError] = useState<string | null>(null);
-  const [refreshing, setRefreshing] = useState(false);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   // Scroll đến kết quả tìm kiếm
   const searchResultsRef = useRef<HTMLDivElement>(null);
+  const { subscribe } = useReload();
   
   // Cập nhật isSearchActive khi categoryFromURL thay đổi
   useEffect(() => {
@@ -40,30 +40,38 @@ const Home: React.FC = () => {
   }, [categoryFromURL, searchFromURL]);
 
   // Tải và hiển thị sản phẩm
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        setError(null);
-        setLoading(true);
-        let productResults = [];
-        
-        if (categoryFromURL) {
-          // Nếu có tham số danh mục, tải sản phẩm theo danh mục
-          productResults = await productService.getProductsByCategory(categoryFromURL);
-        } else {
-          // Ngược lại tải tất cả sản phẩm với tham số mặc định
-          const response = await productService.getProducts({ pageSize: 100 });
-          productResults = response.items;
-        }
-        
-        setProducts(productResults);
-      } catch (error) {
-        setError('Không thể tải dữ liệu sản phẩm. Vui lòng thử lại sau.');
-      } finally {
-        setLoading(false);
+  const fetchProducts = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      let productResults = [];
+      
+      if (categoryFromURL) {
+        // Nếu có tham số danh mục, tải sản phẩm theo danh mục
+        productResults = await productService.getProductsByCategory(categoryFromURL);
+      } else {
+        // Ngược lại tải tất cả sản phẩm với tham số mặc định
+        const response = await productService.getProducts({ pageSize: 100 });
+        productResults = response.items;
       }
-    };
+      
+      setProducts(productResults);
+    } catch (error) {
+      setError('Không thể tải dữ liệu sản phẩm. Vui lòng thử lại sau.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
+    const unsub = subscribe(() => {
+      // Gọi lại fetchProducts khi có sự kiện reload
+      fetchProducts();
+    });
+    return unsub;
+  }, [subscribe]);
+
+  useEffect(() => {
     fetchProducts();
     
     // Nếu có tham số tìm kiếm hoặc danh mục, cuộn đến phần kết quả
@@ -73,61 +81,6 @@ const Home: React.FC = () => {
       }, 500);
     }
   }, [categoryFromURL, isSearchActive]);
-
-  // Thêm function để refresh dữ liệu sản phẩm
-  const refreshProducts = async () => {
-    try {
-      setRefreshing(true);
-      const response = await productService.getProducts({ pageSize: 100 });
-      
-      setProducts(response.items);
-      setError(null);
-      setLastRefresh(new Date());
-      
-      // Hiển thị thông báo thành công ngắn gọn
-      const toast = document.createElement('div');
-      
-      document.body.appendChild(toast);
-      
-      setTimeout(() => {
-        toast.style.opacity = '0';
-        setTimeout(() => document.body.removeChild(toast), 300);
-      }, 2000);
-      
-    } catch (error) {
-      setError('Không thể làm mới dữ liệu sản phẩm.');
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  // Tự động refresh dữ liệu mỗi 60 giây khi user đang xem trang (giảm frequency)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Chỉ refresh khi user đang active trên trang và đã qua ít nhất 60 giây kể từ lần refresh cuối
-      if (!document.hidden && !refreshing) {
-        const timeSinceLastRefresh = Date.now() - lastRefresh.getTime();
-        if (timeSinceLastRefresh >= 60000) { // 60 giây
-          refreshProducts();
-        }
-      }
-    }, 60000); // 60 giây
-
-    return () => clearInterval(interval);
-  }, [lastRefresh, refreshing]);
-
-  // Refresh dữ liệu khi user quay lại trang (focus) - nhưng chỉ sau 10 giây
-  useEffect(() => {
-    const handleFocus = () => {
-      const timeSinceLastRefresh = Date.now() - lastRefresh.getTime();
-      if (timeSinceLastRefresh >= 10000 && !refreshing) { // 10 giây
-        refreshProducts();
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [lastRefresh, refreshing]);
 
   const newProducts = products.filter(p => p.isNew).slice(0, 4);
 
@@ -277,10 +230,16 @@ const Home: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     {filteredProducts.filter(p => p.isBestSeller).slice(0, 4).map((p) => (
-                      <div key={p.id} className="bg-gray-800/60 p-3 rounded-lg hover:bg-gray-700/60 transition">
+                      <div key={p.id} className="bg-gray-800/60 p-3 rounded-lg hover:bg-gray-700/60 transition flex flex-col items-center">
                         <img src={p.image} alt={p.name} className="w-full h-24 object-contain mb-2" />
                         <p className="text-sm font-medium text-white truncate">{p.name}</p>
                         <p className="text-blue-400 font-bold">{p.price.toLocaleString()}₫</p>
+                        <button
+                          className="mt-2 px-4 py-1 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold rounded-full shadow transition"
+                          onClick={() => window.location.href = `/product/${p.id}`}
+                        >
+                          Mua ngay
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -292,41 +251,19 @@ const Home: React.FC = () => {
       </section>
       
       {/* Bộ lọc và tìm kiếm sản phẩm - Cải tiến thiết kế */}
-      <section className="container mx-auto px-4 py-8">
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-12 border border-blue-100 transform -translate-y-6 relative z-20">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+      <section className="container mx-auto px-4 pt-4 pb-2">
+        <div className="bg-white rounded-2xl shadow-lg p-8 mb-4 border border-blue-100 transform -translate-y-2 relative z-20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-blue-800">Tìm kiếm thông minh</h2>
               </div>
-              <h2 className="text-2xl font-bold text-blue-800">Tìm kiếm thông minh</h2>
-            </div>
-            <div className="hidden md:flex md:flex-col md:items-end">
               <span className="text-sm text-gray-500">Tìm thấy <strong className="text-blue-600">{filteredProducts.length}</strong> sản phẩm</span>
-              <span className="text-xs text-gray-400">
-                Cập nhật lúc: {lastRefresh.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-              </span>
-            </div>
-            <button
-              onClick={refreshProducts}
-              disabled={refreshing}
-              className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                refreshing 
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed' 
-                  : 'bg-white border-blue-200 text-blue-600 hover:bg-blue-50'
-              }`}
-              title="Làm mới dữ liệu sản phẩm"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">
-                {refreshing ? 'Đang tải...' : 'Làm mới'}
-              </span>
-            </button>
-          </div>
-          
-          <form
+            </div>          <form
             onSubmit={handleSearch}
             className="relative"
           >
@@ -546,9 +483,6 @@ const Home: React.FC = () => {
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 md:mb-12 gap-4">
               <h2 className="text-2xl md:text-3xl font-bold">Sản phẩm nổi bật</h2>
-              <Link to="/products" className="text-blue-600 hover:text-blue-700 font-medium">
-                Xem tất cả <ArrowRight className="inline w-4 h-4 ml-1" />
-              </Link>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {filteredProducts.filter(p => p.isBestSeller || p.isNew).slice(0, 6).map((product) => (
@@ -564,9 +498,6 @@ const Home: React.FC = () => {
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 md:mb-12 gap-4">
             <h2 className="text-2xl md:text-3xl font-bold">Hàng mới về</h2>
-            <Link to="/products?filter=new" className="text-blue-600 hover:text-blue-700 font-medium">
-              Xem tất cả <ArrowRight className="inline w-4 h-4 ml-1" />
-            </Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {newProducts.map((product) => (

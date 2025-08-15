@@ -45,6 +45,18 @@ const UserProfile: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Đồng bộ form với profile mỗi khi profile thay đổi
+  useEffect(() => {
+    if (profile) {
+      setForm({
+        name: profile.name || '',
+        email: profile.email || '',
+        phone: profile.phone || '',
+        address: profile.address || ''
+      });
+    }
+  }, [profile]);
+
   useEffect(() => {
     let ignore = false;
     const load = async () => {
@@ -83,7 +95,12 @@ const UserProfile: React.FC = () => {
         
         try {
           // Sau đó thử lấy thông tin chi tiết từ API
-          const me = await getCurrentCustomer();
+          const apiRes = await getCurrentCustomer();
+          // Kiểm tra nếu có data.customer thì lấy, không thì lấy trực tiếp
+          let me: any = apiRes;
+          if (apiRes && typeof apiRes === 'object' && 'data' in apiRes && apiRes.data && typeof apiRes.data === 'object' && 'customer' in apiRes.data) {
+            me = apiRes.data.customer;
+          }
           prof = {
             userId: me.userId,
             name: me.name,
@@ -107,7 +124,7 @@ const UserProfile: React.FC = () => {
         
         if (!ignore && prof) {
           setProfile(prof);
-          setForm({ name: prof.name || '', email: prof.email || '', phone: prof.phone || '', address: prof.address || '' });
+          // Đã có useEffect để sync form với profile, không cần set form ở đây
         }
       } catch (e: unknown) {
         if (!ignore) {
@@ -132,19 +149,24 @@ const UserProfile: React.FC = () => {
     if (!profile) return;
     setError(null);
     try {
-      const updated = await updateCurrentCustomer({
+      const updatedRes = await updateCurrentCustomer({
         name: form.name.trim(),
         email: form.email.trim(),
         phone: form.phone.trim(),
         address: form.address.trim(),
       });
+      // Nếu API trả về dạng { data: { customer: ... } }
+      let updated: any = updatedRes;
+      if (updatedRes && typeof updatedRes === 'object' && 'data' in updatedRes && updatedRes.data && typeof updatedRes.data === 'object' && 'customer' in updatedRes.data) {
+        updated = updatedRes.data.customer;
+      }
       setProfile({
         userId: updated.userId,
         name: updated.name,
         email: updated.email,
         role: updated.role,
-        phone: updated.phone,
-        address: updated.address,
+        phone: updated.phone || '',
+        address: updated.address || '',
         createdAt: updated.createdAt,
         updatedAt: updated.updatedAt,
         // Preserve metrics data from previous profile state
@@ -165,14 +187,23 @@ const UserProfile: React.FC = () => {
       
       // Reload customer data to refresh metrics
       try {
-        const refreshed = await getCurrentCustomer();
+        const refreshedRes = await getCurrentCustomer();
+        let refreshed: any = refreshedRes;
+        if (refreshedRes && typeof refreshedRes === 'object' && 'data' in refreshedRes && refreshedRes.data && typeof refreshedRes.data === 'object' && 'customer' in refreshedRes.data) {
+          refreshed = refreshedRes.data.customer;
+        }
         if (refreshed) {
-          setProfile({
-            ...updated,
+          setProfile(prev => prev ? {
+            ...prev,
+            name: refreshed.name,
+            email: refreshed.email,
+            phone: refreshed.phone || '',
+            address: refreshed.address || '',
             orderCount: refreshed.orderCount,
             totalSpent: refreshed.totalSpent,
             recentOrders: refreshed.recentOrders,
-          });
+            updatedAt: refreshed.updatedAt,
+          } : null);
         }
       } catch (refreshError) {
         // Silent fail - we still updated the profile successfully
@@ -243,33 +274,26 @@ const UserProfile: React.FC = () => {
       }
       
       // Gọi API để lấy thông tin mới nhất
-      const me = await getCurrentCustomer();
+      const apiRes = await getCurrentCustomer();
+      let me: any = apiRes;
+      if (apiRes && typeof apiRes === 'object' && 'data' in apiRes && apiRes.data && typeof apiRes.data === 'object' && 'customer' in apiRes.data) {
+        me = apiRes.data.customer;
+      }
       setProfile(prev => {
         if (!prev) return null;
-        debugger;
         return {
           ...prev,
           name: me.name || prev.name,
           email: me.email || prev.email,
-          phone: me.phone || prev.phone,
-          address: me.address || prev.address,
+          phone: me.phone || prev.phone || '',
+          address: me.address || prev.address || '',
           orderCount: me.orderCount || prev.orderCount || 0,
           totalSpent: me.totalSpent || prev.totalSpent || 0,
           recentOrders: me.recentOrders || prev.recentOrders || [],
           updatedAt: me.updatedAt || prev.updatedAt,
         };
       });
-      
-      // Cập nhật form nếu cần
-      if (me) {
-        setForm(prev => ({
-          ...prev,
-          name: me.name || prev.name,
-          email: me.email || prev.email,
-          phone: me.phone || prev.phone,
-          address: me.address || prev.address
-        }));
-      }
+      // Form sẽ được cập nhật tự động thông qua useEffect
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -302,15 +326,19 @@ const UserProfile: React.FC = () => {
         )}
         <div className="flex flex-col items-center mb-6">
           <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-3xl font-bold text-blue-600 mb-2">
-            {profile.name ? 'profile.name.charAt(0).toUpperCase()' : 'profile.email.charAt(0).toUpperCase()'}
+            {profile.name && profile.name.length > 0
+              ? profile.name.charAt(0).toUpperCase()
+              : (profile.email && profile.email.length > 0
+                ? profile.email.charAt(0).toUpperCase()
+                : '?')}
           </div>
           <div className="text-lg font-semibold text-gray-800">{profile.name}</div>
           <div className="text-sm text-gray-500">{profile.email}</div>
           <div className="text-sm text-gray-500">Vai trò: {profile.role === 'admin' ? 'Quản trị viên' : 'Khách hàng'}</div>
         </div>
         
-        {/* Customer metrics display */}
-        <ProfileMetrics customer={profile} />
+  {/* Customer metrics display (không hiển thị đơn hàng gần đây) */}
+  <ProfileMetrics customer={{ ...profile, recentOrders: undefined }} />
         <form onSubmit={handleSave} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Họ và tên</label>

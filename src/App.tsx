@@ -10,7 +10,7 @@ const ScrollToTop: React.FC = () => {
   return null;
 };
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider } from './context/CartContext';
 import Header from './components/Layout/Header';
@@ -29,8 +29,10 @@ import AdminProducts from './pages/admin/AdminProducts';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminReviews from './pages/admin/AdminReviews';
 import CashOnDeliveryInfo from './pages/CashOnDeliveryInfo';
 import CashOnDeliveryConfirm from './pages/CashOnDeliveryConfirm';
+import CheckoutOnline from './pages/CheckoutOnline';
 import LoadingSpinner from './components/UI/LoadingSpinner';
 import StockNotification from './components/UI/StockNotification';
 
@@ -78,42 +80,42 @@ function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <Router>
-          <ScrollToTop />
-          <Routes>
-            {/* Public routes with main layout */}
-            <Route path="/" element={<MainLayout><Home /></MainLayout>} />
-            <Route path="/product/:id" element={<MainLayout><ProductDetail /></MainLayout>} />
-            <Route path="/cart" element={<MainLayout><Cart /></MainLayout>} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route path="/orders" element={<MainLayout><OrderHistory /></MainLayout>} />
-            <Route path="/order-history" element={<MainLayout><OrderHistory /></MainLayout>} />
-            <Route path="/order-detail/:id" element={
-              <ProtectedRoute>
-                <MainLayout><OrderDetail /></MainLayout>
-              </ProtectedRoute>
-            } />
-            <Route path="/account" element={<MainLayout><UserProfile /></MainLayout>} />
-            <Route path="/cash-on-delivery-confirm" element={<MainLayout><CashOnDeliveryConfirm /></MainLayout>} />
-            <Route path="/cash-on-delivery-info" element={<MainLayout><CashOnDeliveryInfo /></MainLayout>} />
-            {/* Đã loại bỏ route Search vì chức năng tìm kiếm đã được tích hợp vào trang Home */}
-            {/* Admin routes */}
-            <Route path="/admin" element={
-              <ProtectedRoute adminOnly>
-                <AdminLayout />
-              </ProtectedRoute>
-            }>
-              <Route index element={<AdminDashboard />} />
-              <Route path="products" element={<AdminProducts />} />
-              <Route path="orders" element={<AdminOrders />} />
-              <Route path="users" element={<AdminUsers />} />
-              <Route path="settings" element={<AdminSettings />} />
-            </Route>
-            {/* Catch all route */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Router>
+        <ScrollToTop />
+        <Routes>
+          {/* Public routes with main layout */}
+          <Route path="/" element={<MainLayout><Home /></MainLayout>} />
+          <Route path="/product/:id" element={<MainLayout><ProductDetail /></MainLayout>} />
+          <Route path="/cart" element={<MainLayout><Cart /></MainLayout>} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/orders" element={<MainLayout><OrderHistory /></MainLayout>} />
+          <Route path="/order-history" element={<MainLayout><OrderHistory /></MainLayout>} />
+          <Route path="/order-detail/:id" element={
+            <ProtectedRoute>
+              <MainLayout><OrderDetail /></MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/account" element={<MainLayout><UserProfile /></MainLayout>} />
+          <Route path="/cash-on-delivery-confirm" element={<MainLayout><CashOnDeliveryConfirm /></MainLayout>} />
+          <Route path="/cash-on-delivery-info" element={<MainLayout><CashOnDeliveryInfo /></MainLayout>} />
+          <Route path="/checkout-online" element={<MainLayout><CheckoutOnline /></MainLayout>} />
+          {/* Đã loại bỏ route Search vì chức năng tìm kiếm đã được tích hợp vào trang Home */}
+          {/* Admin routes */}
+          <Route path="/admin" element={
+            <ProtectedRoute adminOnly>
+              <AdminLayout />
+            </ProtectedRoute>
+          }>
+            <Route index element={<AdminDashboard />} />
+            <Route path="products" element={<AdminProducts />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="settings" element={<AdminSettings />} />
+            <Route path="reviews" element={<AdminReviews />} />
+          </Route>
+          {/* Catch all route */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
       </CartProvider>
     </AuthProvider>
   );
