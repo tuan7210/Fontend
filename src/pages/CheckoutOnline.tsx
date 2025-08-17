@@ -1,10 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
+import { getCurrentCustomer } from '../services/userService';
+import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Button from '../components/UI/Button';
 import { orderService } from '../services/orderService';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import { AlertCircle, Package, User, Phone, Home } from 'lucide-react';
+import { useCart } from '../context/CartContext';
 
 
 const CheckoutOnline: React.FC = () => {
@@ -12,12 +15,17 @@ const CheckoutOnline: React.FC = () => {
   const location = useLocation();
   const state = (location.state as any) || {};
   const [orderId, setOrderId] = useState<number | null>(state.orderId || Number(localStorage.getItem('lastOrderId')) || null);
-  const [shipping, setShipping] = useState({ name: '', phone: '', address: '' });
+  const [shipping, setShipping] = useState('');
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [address, setAddress] = useState('');
+  const { user } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [total, setTotal] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const { handleOrderSuccess } = useCart();
 
   // Luôn lấy thông tin đơn hàng từ backend theo orderId
   useEffect(() => {
@@ -30,14 +38,18 @@ const CheckoutOnline: React.FC = () => {
       setError(null);
       try {
         const order = await orderService.getOrderById(orderId);
-        setShipping({
-          name: order.shippingAddress?.split(',')[0]?.trim() || '',
-          phone: order.shippingAddress?.split(',')[1]?.trim() || '',
-          address: order.shippingAddress?.split(',').slice(2).join(',').trim() || ''
-        });
+        setShipping(order.shippingAddress || '');
         setItems(order.items || []);
         setTotal(order.totalAmount || 0);
         setSuccess(true);
+        // Nếu backend trả về shippingAddress dạng chuỗi, cố gắng parse để lấy tên, sđt, địa chỉ
+        if (order.shippingAddress) {
+          // Giả định shippingAddress: "Tên, SĐT, Địa chỉ, Thành phố, Zip"
+          const parts = order.shippingAddress.split(',').map(s => s.trim());
+          setName(parts[0] || '');
+          setPhone(parts[1] || '');
+          setAddress(parts[2] || '');
+        }
       } catch (err) {
         setError('Không thể lấy thông tin đơn hàng.');
       } finally {
@@ -45,8 +57,31 @@ const CheckoutOnline: React.FC = () => {
       }
     };
     fetchOrder();
+
+    // Ưu tiên lấy thông tin cá nhân từ API nếu đã đăng nhập
+    const fetchCustomerInfo = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const customer = await getCurrentCustomer();
+          setName(customer.name || '');
+          setPhone(customer.phone || '');
+          setAddress(customer.address || '');
+        } else if (user) {
+          setName(user.name || '');
+        }
+      } catch (e) {
+        if (user) setName(user.name || '');
+      }
+    };
+    fetchCustomerInfo();
     // eslint-disable-next-line
-  }, [orderId]);
+  }, [orderId, user]);
+
+  const onConfirmPaid = async () => {
+    await handleOrderSuccess();
+    navigate('/');
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center py-10">
@@ -103,24 +138,41 @@ const CheckoutOnline: React.FC = () => {
             </div>
             <div className="mb-6 bg-blue-50 rounded-xl p-4 border border-blue-100">
               <div className="font-bold text-blue-700 mb-2">Thông tin giao hàng</div>
-              <div className="flex items-center mb-2">
-                <User className="w-5 h-5 text-blue-400 mr-2" />
-                <span className="font-medium">Tên khách hàng:</span>
-                <span className="ml-2 text-blue-700">{shipping.name}</span>
-              </div>
-              <div className="flex items-center mb-2">
-                <Phone className="w-5 h-5 text-blue-400 mr-2" />
-                <span className="font-medium">Số điện thoại:</span>
-                <span className="ml-2 text-blue-700">{shipping.phone}</span>
-              </div>
-              <div className="flex items-center">
-                <Home className="w-5 h-5 text-blue-400 mr-2" />
-                <span className="font-medium">Địa chỉ nhận hàng:</span>
-                <span className="ml-2 text-blue-700">{shipping.address}</span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-blue-700 mb-1">Họ tên</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-blue-700 mb-1">Số điện thoại</label>
+                  <input
+                    type="tel"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-blue-700 mb-1">Địa chỉ nhận hàng</label>
+                  <input
+                    type="text"
+                    className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    required
+                  />
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-3 mt-4">
-              <Button type="button" className="w-full bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-green-700 transition-all text-lg" onClick={() => navigate('/') }>
+              <Button type="button" className="w-full bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-green-700 transition-all text-lg" onClick={ onConfirmPaid }>
                 Xác nhận đã thanh toán
               </Button>
               <Button className="w-full bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition-all text-lg" onClick={() => navigate('/order-history')}>

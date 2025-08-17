@@ -76,7 +76,8 @@ const ProductReviewManagement = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRating, setFilterRating] = useState<number | null>(null);
-  const [showHidden, setShowHidden] = useState(false);
+  // Mặc định luôn hiển thị tất cả đánh giá (cả đã ẩn và đã duyệt)
+  const [showHidden, setShowHidden] = useState(true);
   const [loading, setLoading] = useState(false);
   const [reviewStats, setReviewStats] = useState<{ totalReviews: number; averageRating: number } | null>(null);
 
@@ -123,7 +124,7 @@ const ProductReviewManagement = () => {
           rating: r.rating,
           comment: r.comment,
           createdAt: r.createdAt,
-          isVerified: r.isVerified ?? true // fallback true nếu không có trường này
+          isVerified: r.is_verified ?? true // map đúng trường trạng thái từ backend
         })));
         setReviewStats({
           totalReviews: data.data.statistics?.totalReviews || 0,
@@ -169,6 +170,8 @@ const ProductReviewManagement = () => {
 
   const getFilteredReviews = () => {
     let filtered = reviews.filter(review => {
+      // Nếu showHidden = true (mặc định), luôn hiển thị tất cả đánh giá
+      // Nếu showHidden = false, chỉ hiển thị đánh giá đã duyệt
       if (!showHidden && !review.isVerified) return false;
       if (filterRating && review.rating !== filterRating) return false;
       return true;
@@ -306,7 +309,7 @@ const ProductReviewManagement = () => {
                             ? 'bg-emerald-100 text-emerald-700' 
                             : 'bg-rose-100 text-rose-700'
                         }`}>
-                          {review.isVerified ? 'Hiển thị' : 'đã ẩn'}
+                          {review.isVerified ? 'Đã duyệt' : 'Đã ẩn'}
                         </div>
                         <button
                           onClick={() => toggleReviewVisibility(review.reviewId, !review.isVerified)}

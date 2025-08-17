@@ -111,30 +111,20 @@ export interface PagedCustomers {
   totalPages: number;
 }
 
-export async function getCustomers(params: GetCustomersParams = {}): Promise<PagedCustomers> {
+export async function getCustomers(params: GetCustomersParams = {}): Promise<any> {
   const q = new URLSearchParams();
   if (params.page) q.set('page', String(params.page));
   if (params.pageSize) q.set('pageSize', String(params.pageSize));
-  
+
   let endpoint = '/api/Customer';
-  
-  // Nếu có search, sử dụng endpoint search với tham số keyword
   if (params.search) {
     endpoint = '/api/Customer/search';
     q.set('keyword', params.search);
   }
-  
   const query = q.toString();
-  const resp = await http<ApiCustomer[]>(`${endpoint}${query ? `?${query}` : ''}`);
-  const apiItems = Array.isArray(resp.data) ? resp.data : [];
-  const items = apiItems.map(mapApiCustomer);
-  return {
-    items,
-    page: resp.pagination?.page ?? params.page ?? 1,
-    pageSize: resp.pagination?.pageSize ?? params.pageSize ?? 10,
-    totalCount: resp.pagination?.totalCount ?? items.length,
-    totalPages: resp.pagination?.totalPages ?? 1,
-  };
+  // Gọi API và trả về nguyên object response (data, pagination...)
+  const resp = await http<any>(`${endpoint}${query ? `?${query}` : ''}`);
+  return resp;
 }
 
 export async function getCustomerById(id: number | string): Promise<Customer> {
@@ -150,7 +140,6 @@ export async function getCurrentCustomer(): Promise<Customer> {
     const token = localStorage.getItem('token');
     const userData = localStorage.getItem('user');
     const userInfo = localStorage.getItem('userInfo');
-    
     if (!token || !userInfo) {
       throw new Error('Người dùng chưa đăng nhập');
     }
@@ -163,18 +152,8 @@ export async function getCurrentCustomer(): Promise<Customer> {
       throw new Error('Dữ liệu người dùng không hợp lệ');
     }
     
-    // Thử gọi API endpoint /api/Customer/me trước
-    try {
-      const resp = await http<ApiCustomer>(`/api/Customer/${user.id}`);
-      if (resp.data) {
-        return mapApiCustomer(resp.data as ApiCustomer);
-      }
-    } catch (meApiError) {
-      // Tiếp tục thử phương pháp khác nếu endpoint này thất bại
-    }
-    
     // Phương pháp dự phòng: sử dụng userId từ localStorage
-    const userId = user?.userId;
+    const userId = user?.id;
     
     if (userId) {
       // Nếu có userId, lấy thông tin chi tiết của user từ API
@@ -310,22 +289,22 @@ export async function deleteCustomer(id: number | string): Promise<void> {
   }
 }
 
-function mapApiCustomer(api: ApiCustomer): Customer {
+function mapApiCustomer(api: any): Customer {
+  // Hỗ trợ cả trường hợp api là object gốc hoặc có lồng customer
+  const customer = api.customer || api;
+  // Lấy userId từ nhiều trường hợp khác nhau
+  const userId = customer.userId ?? customer.id ?? customer.userID ?? api.userId ?? api.id ?? api.userID;
   return {
-    userId: api.userId ?? api.id ?? api.userID ?? 0,
-    name: api.name,
-    email: api.email,
-    phone: api.phone ?? '',
-    role: api.role ?? 'customer',
-    address: api.address ?? '',
-    createdAt: api.createdAt ?? undefined,
-    updatedAt: api.updatedAt ?? undefined,
-    // Mặc định trạng thái là active nếu không có
-    status: (api as any).status || 'active',
-    // Map customer metrics from API response
-    orderCount: api.orderCount ?? 0,
-    totalSpent: api.totalSpent ?? 0,
-    recentOrders: api.recentOrders ?? [],
+    userId: userId,
+    name: customer.name || '',
+    email: customer.email || '',
+    phone: customer.phone ?? '',
+    role: customer.role ?? api.role ?? 'customer',
+    address: customer.address ?? '',
+    status: customer.status || 'active',
+    orderCount: customer.orderCount ?? api.orderCount ?? 0,
+    totalSpent: customer.totalSpent ?? api.totalSpent ?? 0,
+    recentOrders: customer.recentOrders ?? api.recentOrders ?? [],
   };
 }
 

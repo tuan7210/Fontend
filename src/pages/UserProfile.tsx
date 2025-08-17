@@ -69,34 +69,11 @@ const UserProfile: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        // Trước tiên thử tạo profile từ thông tin đã lưu trong localStorage
         let prof: Profile | null = null;
-        const userData = localStorage.getItem('user');
-        
-        if (userData) {
-          try {
-            const userJson = JSON.parse(userData);
-            // Khởi tạo profile cơ bản từ localStorage
-            prof = {
-              userId: userJson.userId || 0,
-              name: userJson.name || '',
-              email: userJson.email || '',
-              role: userJson.role || 'customer',
-              phone: '',
-              address: '',
-              // Khởi tạo giá trị mặc định cho metrics
-              orderCount: 0,
-              totalSpent: 0,
-              recentOrders: [],
-            };
-          } catch (parseError) {
-          }
-        }
         
         try {
-          // Sau đó thử lấy thông tin chi tiết từ API
+          
           const apiRes = await getCurrentCustomer();
-          // Kiểm tra nếu có data.customer thì lấy, không thì lấy trực tiếp
           let me: any = apiRes;
           if (apiRes && typeof apiRes === 'object' && 'data' in apiRes && apiRes.data && typeof apiRes.data === 'object' && 'customer' in apiRes.data) {
             me = apiRes.data.customer;
@@ -371,15 +348,6 @@ const UserProfile: React.FC = () => {
               onChange={handleChange}
               disabled={!editing}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Ngày tạo tài khoản</label>
-            <input
-              type="text"
-              value={profile.createdAt ? new Date(profile.createdAt).toLocaleString() : ''}
-              disabled
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 bg-gray-100"
             />
           </div>
           <div className="flex justify-center gap-4 mt-6">

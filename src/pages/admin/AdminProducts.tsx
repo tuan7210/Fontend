@@ -301,7 +301,6 @@ const AdminProducts: React.FC = () => {
   // Xử lý lưu sản phẩm
   const handleSaveProduct = async () => {
     if (!editingProduct) return;
-    debugger;
     setSaving(true);
     setErrorMsg('');
     setSuccessMsg('');

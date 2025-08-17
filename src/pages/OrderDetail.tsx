@@ -37,10 +37,45 @@ const OrderDetail: React.FC = () => {
       try {
         const orderData = await orderService.getOrderById(id);
         
-        // Kiểm tra xem người dùng có quyền xem đơn hàng này không
+        // Map OrderResponse -> Order chuẩn cho UI
         if (orderData) {
-          if (user?.role === 'admin' || orderData.userId === user?.email) {
-            setOrder(orderData);
+          const mappedOrder: Order = {
+            id: orderData.orderId?.toString() || id.toString(),
+            userId: orderData.userId?.toString() || orderData.username || '',
+            items: (orderData.items || []).map((item: any) => ({
+              id: item.orderItemId?.toString() || item.id?.toString() || '',
+              product: {
+                id: item.productId?.toString() || '',
+                name: item.productName || '',
+                price: item.price || 0,
+                image: item.imageUrl || '',
+                category: '',
+                brand: '',
+                description: '',
+                specifications: {},
+                stock: 0,
+                rating: 0,
+                reviews: 0,
+              },
+              quantity: item.quantity || 0,
+            })),
+            total: orderData.totalAmount || 0,
+            status: orderData.status as any,
+            shippingAddress: {
+              firstName: '',
+              lastName: '',
+              email: orderData.email || '',
+              phone: orderData.phone || '',
+              address: typeof orderData.shippingAddress === 'string' ? orderData.shippingAddress : '',
+              city: '',
+              zipCode: '',
+            },
+            paymentMethod: orderData.paymentMethod,
+            createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
+            updatedAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
+          };
+          if (user?.role === 'admin' || mappedOrder.userId === user?.email) {
+            setOrder(mappedOrder);
           } else {
             setOrder(null);
           }
@@ -129,6 +164,16 @@ const OrderDetail: React.FC = () => {
                   <p className="text-gray-600">{order.shippingAddress.phone}</p>
                   <p className="text-gray-600">
                     {order.shippingAddress.address}, {order.shippingAddress.city}, {order.shippingAddress.zipCode}
+                  </p>
+                  <p className="text-gray-600 mt-2">
+                    <span className="font-medium">Phương thức thanh toán: </span>
+                    {order.paymentMethod === 'online'
+                      ? 'Chuyển khoản'
+                      : order.paymentMethod === 'cash_on_delivery'
+                        ? 'Thanh toán khi nhận hàng'
+                        : order.paymentMethod
+                          ? order.paymentMethod
+                          : 'Không xác định'}
                   </p>
                 </div>
               </div>

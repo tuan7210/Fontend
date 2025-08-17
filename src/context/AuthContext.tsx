@@ -37,7 +37,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // Đảm bảo role được gán đúng, nếu API không trả về role
         const userRole = result.role || (isAdminAccount ? 'admin' : 'customer');
-        
         localStorage.setItem('token', result.token);
         localStorage.setItem('role', userRole);
         

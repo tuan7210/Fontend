@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { getCurrentCustomer } from '../services/userService';
 import Button from '../components/UI/Button';
 import { orderService, CreateOrderRequest } from '../services/orderService';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
@@ -25,22 +26,26 @@ const CashOnDeliveryConfirm: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
   
   useEffect(() => {
-    // Load user info if available
-    if (user) {
-      // Ưu tiên lấy từ userInfo nếu có (có phone, address)
-      const savedUserInfo = localStorage.getItem('userInfo');
-      if (savedUserInfo) {
-        try {
-          const userInfo = JSON.parse(savedUserInfo);
-          setName(userInfo.name || '');
-          setPhone(userInfo.phone || '');
-          setAddress(userInfo.address || '');
-        } catch (e) {}
-      } else {
-        // Fallback: chỉ lấy name từ user context
-        setName(user.name || '');
+    // Ưu tiên lấy thông tin cá nhân từ API nếu đã đăng nhập
+    const fetchCustomerInfo = async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (token) {
+          const customer = await getCurrentCustomer();
+          setName(customer.name || '');
+          setPhone(customer.phone || '');
+          setAddress(customer.address || '');
+        } else if (user) {
+          // Fallback: chỉ lấy name từ user context
+          setName(user.name || '');
+        }
+      } catch (e) {
+        // Nếu lỗi vẫn fallback lấy từ localStorage hoặc context
+        if (user) setName(user.name || '');
       }
-    }
+    };
+    fetchCustomerInfo();
+
     // Load stored items
     const storedItems = localStorage.getItem('checkoutItems');
     if (storedItems) {
@@ -68,12 +73,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
         setTimeout(() => navigate('/login'), 2000);
         return;
       }
-      // Validate form data
-      if (!name.trim() || !phone.trim() || !address.trim()) {
-        setError("Vui lòng điền đầy đủ thông tin");
-        setIsProcessing(false);
-        return;
-      }
       // Get items either from cart or from localStorage
       const orderItems = checkoutItems.length > 0 ? checkoutItems : items;
       if (orderItems.length === 0) {
@@ -93,16 +92,13 @@ const CashOnDeliveryConfirm: React.FC = () => {
         };
         const response = await orderService.createOrder(orderRequest);
         // Lưu orderId vào localStorage để trang checkout-online có thể lấy lại nếu reload
-  localStorage.setItem('lastOrderId', String(response.orderId));
+        localStorage.setItem('lastOrderId', String(response.orderId));
         localStorage.removeItem('checkoutItems');
         localStorage.removeItem('checkoutTotal');
         // Chuyển sang trang checkout-online, truyền orderId và info để hiển thị QR
         navigate('/checkout-online', {
           state: {
             orderId: response.orderId,
-            name,
-            phone,
-            address,
             items: orderItems,
             total: response.totalAmount || getTotalPrice() * 1.08
           }
@@ -122,7 +118,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
       // Đơn hàng tạo thành công nếu không có lỗi
       localStorage.removeItem('checkoutItems');
       localStorage.removeItem('checkoutTotal');
-      await handleOrderSuccess(orderItems);
+      await handleOrderSuccess();
       setConfirmed(true);
       setTimeout(() => {
         navigate('/cash-on-delivery-info', {
@@ -191,36 +187,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
             )}
           </div>
         <form onSubmit={handleConfirm} className="space-y-5">
-          <div className="text-left">
-            <label className="block font-medium mb-1 text-blue-700">Tên khách hàng</label>
-            <input
-              type="text"
-              value={name}
-              onChange={e => setName(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-800"
-              required
-            />
-          </div>
-          <div className="text-left">
-            <label className="block font-medium mb-1 text-blue-700">Số điện thoại</label>
-            <input
-              type="text"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-800"
-              required
-            />
-          </div>
-          <div className="text-left">
-            <label className="block font-medium mb-1 text-blue-700">Địa chỉ nhận hàng</label>
-            <input
-              type="text"
-              value={address}
-              onChange={e => setAddress(e.target.value)}
-              className="w-full px-4 py-2 border-2 border-blue-200 rounded-xl focus:ring-2 focus:ring-blue-400 focus:outline-none text-gray-800"
-              required
-            />
-          </div>
           {error && (
             <div className="p-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
               <div className="flex items-center">

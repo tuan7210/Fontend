@@ -102,7 +102,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   // Xử lý sau khi đặt hàng thành công
-  const handleOrderSuccess = async (orderItems: CartItem[]) => {
+  const handleOrderSuccess = async () => {
     // Chỉ xóa giỏ hàng, backend sẽ tự động trừ stock
     clearCart();
   };

@@ -26,9 +26,9 @@ const AdminUsers: React.FC = () => {
     setError(null);
     try {
       const resp = await getCustomers({ page, pageSize, search: search || undefined });
-      setCustomers(resp.items);
-      setTotalPages(resp.totalPages);
-      setTotalCount(resp.totalCount);
+  setCustomers(Array.isArray(resp.data) ? resp.data : []);
+  setTotalPages(resp.pagination && typeof resp.pagination.totalPages === 'number' ? resp.pagination.totalPages : 1);
+  setTotalCount(resp.pagination && typeof resp.pagination.totalCount === 'number' ? resp.pagination.totalCount : (Array.isArray(resp.data) ? resp.data.length : 0));
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg || 'Không tải được danh sách khách hàng');
@@ -91,19 +91,12 @@ const AdminUsers: React.FC = () => {
       setError('Không thể khóa tài khoản admin');
       return;
     }
-    
     if (!window.confirm(`Bạn có chắc chắn muốn khóa tài khoản của ${c.name}?`)) return;
     setError(null);
-    
     try {
       await lockCustomerAccount(c.userId);
       setSuccess(`Đã khóa tài khoản của ${c.name} thành công`);
-      // Cập nhật lại danh sách khách hàng
-      setCustomers(prev => prev.map(customer => 
-        customer.userId === c.userId 
-          ? { ...customer, status: 'locked' } 
-          : customer
-      ));
+      await fetchData(); // Làm mới danh sách khách hàng từ API
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg || 'Khóa tài khoản thất bại');
@@ -114,16 +107,10 @@ const AdminUsers: React.FC = () => {
   const handleUnlockAccount = async (c: Customer) => {
     if (!window.confirm(`Bạn có chắc chắn muốn mở khóa tài khoản của ${c.name}?`)) return;
     setError(null);
-    
     try {
       await unlockCustomerAccount(c.userId);
       setSuccess(`Đã mở khóa tài khoản của ${c.name} thành công`);
-      // Cập nhật lại danh sách khách hàng
-      setCustomers(prev => prev.map(customer => 
-        customer.userId === c.userId 
-          ? { ...customer, status: 'active' } 
-          : customer
-      ));
+      await fetchData(); // Làm mới danh sách khách hàng từ API
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg || 'Mở khóa tài khoản thất bại');

@@ -41,11 +41,16 @@ const AdminOrders: React.FC = () => {
 
   const handleUpdateStatus = async (orderId: number, newStatus: OrderResponse['status']) => {
     setUpdatingOrder(orderId);
-    // Đảm bảo newStatus là đúng union type
-    await orderService.updateOrderStatus(orderId, newStatus as any);
-    setSelectedOrder(null);
-    setUpdatingOrder(null);
-    fetchOrders();
+    // Gọi API đúng chuẩn backend: PUT /api/Order/{id}/status với body { status }
+    try {
+      await orderService.updateOrderStatusV2(orderId, newStatus);
+      setSelectedOrder(null);
+      fetchOrders();
+    } catch (e) {
+      alert('Cập nhật trạng thái đơn hàng thất bại!');
+    } finally {
+      setUpdatingOrder(null);
+    }
   };
   
   const getStatusName = (status: OrderResponse['status']): string => {
@@ -54,7 +59,7 @@ const AdminOrders: React.FC = () => {
       case 'processing': return 'Đang xử lý';
       case 'shipped': return 'Đang giao';
       case 'delivered': return 'Đã giao';
-      case 'cancelled': return 'Đã hủy';
+      case 'canceled': return 'Đã hủy';
       default: return status;
     }
   };
@@ -65,7 +70,7 @@ const AdminOrders: React.FC = () => {
       case 'processing': return <AlertTriangle className="w-4 h-4 text-blue-500" />;
       case 'shipped': return <Truck className="w-4 h-4 text-purple-500" />;
       case 'delivered': return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case 'cancelled': return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'canceled': return <XCircle className="w-4 h-4 text-red-500" />;
       default: return null;
     }
   };
@@ -76,7 +81,7 @@ const AdminOrders: React.FC = () => {
       case 'processing': return 'bg-blue-100 text-blue-700';
       case 'shipped': return 'bg-purple-100 text-purple-700';
       case 'delivered': return 'bg-green-100 text-green-700';
-      case 'cancelled': return 'bg-red-100 text-red-700';
+      case 'canceled': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
@@ -248,6 +253,10 @@ const AdminOrders: React.FC = () => {
                     <span className="text-gray-600">Tổng tiền:</span>
                     <span className="font-bold text-blue-700">{selectedOrder.totalAmount.toLocaleString()} đ</span>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Phương thức thanh toán:</span>
+                    <span className="font-semibold capitalize">{selectedOrder.paymentMethod === 'online' ? 'Thanh toán online' : selectedOrder.paymentMethod === 'cash_on_delivery' ? 'Thanh toán khi nhận hàng' : selectedOrder.paymentMethod}</span>
+                  </div>
                 </div>
               </div>
 
@@ -374,11 +383,11 @@ const AdminOrders: React.FC = () => {
                   </Button>
                 )}
                 
-                {selectedOrder.status !== 'cancelled' && (
+                {selectedOrder.status !== 'canceled' && (
                   <Button
                     onClick={() => {
                       if (window.confirm("Bạn có chắc chắn muốn hủy đơn hàng này?")) {
-                        handleUpdateStatus(selectedOrder.orderId, 'cancelled');
+                        handleUpdateStatus(selectedOrder.orderId, 'canceled');
                       }
                     }}
                     className="bg-red-500 hover:bg-red-600 flex items-center gap-1"

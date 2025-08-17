@@ -1,3 +1,4 @@
+// ...removed misplaced duplicate updateOrderStatusV2...
 // Lấy danh sách đơn hàng có phân trang
 export interface GetOrdersPagedParams {
   page?: number;
@@ -245,6 +246,18 @@ const getSavedOrders = (): Order[] => {
 };
 
 export const orderService = {
+  // API mới: Admin cập nhật trạng thái đơn hàng
+  async updateOrderStatusV2(id: number, status: string) {
+    // Gọi API đúng chuẩn backend: PUT /api/Order/{id}/status với body { status }
+    const response = await http<ApiResponse<any>>(`/api/Order/${id}/status`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+    if (!response.success) {
+      throw new Error(response.message || 'Cập nhật trạng thái đơn hàng thất bại');
+    }
+    return response.data;
+  },
   async getOrdersPaged(params: GetOrdersPagedParams) {
     const { page = 1, pageSize = 10, search = '' } = params || {};
     let url = `/api/Order?page=${page}&pageSize=${pageSize}`;
@@ -326,14 +339,14 @@ export const orderService = {
       
       
       // Real API call to create order and update stock
-      const response = await http<OrderResponse>('/api/Order', {
+      const response = await http<ApiResponse<OrderResponse>>('/api/Order', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
       
       
       // Đơn hàng thành công - cập nhật số lượng tồn kho ở phía client
-      if (response && response.orderId) {
+      if (response && response.data?.orderId) {
         // Lấy userId từ localStorage để lưu đơn hàng
         let username = '';
         const userData = localStorage.getItem('user');
@@ -345,11 +358,11 @@ export const orderService = {
         }
         // Lưu đơn hàng mới vào localStorage (as Order, not OrderResponse)
         this.saveNewOrder({
-          id: response.orderId.toString(),
+          id: response.data.orderId.toString(),
           userId: username,
           items: cartItems,
-          total: response.totalAmount || cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-          status: response.status as 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled',
+          total: response.data.totalAmount || cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
+          status: response.data.status as 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled',
           shippingAddress: {
             firstName: 'N/A',
             lastName: 'N/A',
@@ -359,12 +372,12 @@ export const orderService = {
             city: 'N/A',
             zipCode: 'N/A'
           },
-          createdAt: response.orderDate ? new Date(response.orderDate).toISOString() : new Date().toISOString(),
-          updatedAt: response.orderDate ? new Date(response.orderDate).toISOString() : new Date().toISOString()
+          createdAt: response.data.orderDate ? new Date(response.data.orderDate).toISOString() : new Date().toISOString(),
+          updatedAt: response.data.orderDate ? new Date(response.data.orderDate).toISOString() : new Date().toISOString()
         });
       }
-      
-      return response;
+
+      return response.data!;
     } catch (error) {
       
       
@@ -456,6 +469,7 @@ export const orderService = {
     if (!response.success) {
       throw new Error(response.message);
     }
+    return response;
   },
 
   async confirmPayment(orderId: number) {

@@ -66,6 +66,7 @@ export interface Order {
     city: string;
     zipCode: string;
   };
+  paymentMethod?: string; // Thêm trường phương thức thanh toán
   createdAt: string;
   updatedAt: string;
 }
@@ -93,7 +94,7 @@ export interface CartContextType {
   removeItem: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   clearCart: () => void;
-  handleOrderSuccess: (orderItems: CartItem[]) => Promise<void>;
+  handleOrderSuccess: () => Promise<void>;
   getItemsCount: () => number;
   getTotalPrice: () => number;
 }
