@@ -965,7 +965,9 @@ const AdminProducts: React.FC = () => {
                         previewUrl ||
                         (editingProduct?.imageUrl && editingProduct.imageUrl.match(/^https?:\/\//)
                           ? editingProduct.imageUrl
-                          : editingProduct?.imageUrl)
+                          : editingProduct?.imageUrl
+                            ? `http://localhost:5032/api/Product/image/${editingProduct.imageUrl}`
+                            : '')
                       }
                       alt="Xem trước"
                       className="h-40 object-contain mx-auto"
