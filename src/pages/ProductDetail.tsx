@@ -247,12 +247,9 @@ const ProductDetail: React.FC = () => {
               </div>
               <div className="flex flex-col md:flex-row gap-4">
                 <Button 
-                  onClick={() => {
-                    if (product.stock < quantity) {
-                      // Không cho thêm nếu vượt quá tồn kho, không hiện alert
-                      return;
-                    }
-                    const success = addItem(product, quantity);
+                  onClick={async () => {
+                    if (product.stock < quantity) return;
+                    const success = await addItem(product, quantity);
                     if (success) {
                       alert('Đã thêm sản phẩm vào giỏ hàng!');
                     } else {
@@ -266,9 +263,9 @@ const ProductDetail: React.FC = () => {
                   {product.stock === 0 ? 'Hết hàng' : 'Thêm vào giỏ hàng'}
                 </Button>
                 <Button
-                  onClick={() => {
+                  onClick={async () => {
                     if (product.stock < quantity) return;
-                    const success = addItem(product, quantity);
+                    const success = await addItem(product, quantity);
                     if (success) {
                       navigate('/cart');
                     } else {

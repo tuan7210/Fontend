@@ -90,10 +90,10 @@ export interface RegisterData {
 export interface CartContextType {
   items: CartItem[];
   // Returns true if item was added; false if action requires auth (caller can handle navigation)
-  addItem: (product: Product, quantity?: number) => boolean;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
-  clearCart: () => void;
+  addItem: (product: Product, quantity?: number) => Promise<boolean>;
+  removeItem: (productId: string) => Promise<void>;
+  updateQuantity: (productId: string, quantity: number) => Promise<void>;
+  clearCart: () => Promise<void>;
   handleOrderSuccess: () => Promise<void>;
   getItemsCount: () => number;
   getTotalPrice: () => number;

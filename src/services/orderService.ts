@@ -15,7 +15,7 @@ export interface OrdersPagedResponse {
     totalPages: number;
   };
 }
-import { Order, CartItem, ApiResponse, PaginatedResponse } from '../types';
+import { Order, ApiResponse, PaginatedResponse } from '../types';
 import type { OrderResponse } from '../types';
 
 // API URL configuration
@@ -218,32 +218,6 @@ export interface CreateOrderRequest {
 
 
 
-// Hàm để lưu đơn hàng vào localStorage
-const saveOrdersToStorage = (orders: Order[]) => {
-  localStorage.setItem('orders', JSON.stringify(orders));
-};
-
-// Hàm để lấy đơn hàng từ localStorage
-const getOrdersFromStorage = (): Order[] => {
-  const savedOrders = localStorage.getItem('orders');
-  if (savedOrders) {
-    try {
-      return JSON.parse(savedOrders);
-    } catch (error) {
-      
-    }
-  }
-  return [];
-};
-
-// Kết hợp đơn hàng mặc định và đơn hàng được lưu trong localStorage
-const getSavedOrders = (): Order[] => {
-  const savedOrders = getOrdersFromStorage();
-  if (savedOrders.length > 0) {
-    return savedOrders;
-  }
-  return mockOrders;
-};
 
 export const orderService = {
   // API mới: Admin cập nhật trạng thái đơn hàng
@@ -311,20 +285,14 @@ export const orderService = {
       // Gọi API với ID người dùng cụ thể
       return await http<Order[]>(`/api/OrderTable/customer/${userIdToUse}`);
     } catch (error) {
-      
-      // Fallback to localStorage or mock data
-      const savedOrders = getSavedOrders();
-      return savedOrders.filter(o => {
-        // Nếu không có userId, trả về mảng rỗng
-        if (!userId) return false;
-        return o.userId === userId;
-      });
+      // Fallback: dùng mockOrders tối thiểu nếu cần hiển thị khi mất kết nối (không dùng localStorage)
+      if (!userId) return [];
+      return mockOrders.filter(o => o.userId === userId);
     }
   },
 
   async createOrder(orderData: CreateOrderRequest): Promise<OrderResponse> {
-    // Lấy thông tin chi tiết của các sản phẩm từ localStorage để cập nhật hàng tồn kho
-    const cartItems: CartItem[] = JSON.parse(localStorage.getItem('checkoutItems') || '[]');
+    // Không còn phụ thuộc localStorage cho checkout items; backend là nguồn sự thật
     
     try {
       // Tạo payload không có userId (backend sẽ tự lấy từ JWT token)
@@ -345,122 +313,15 @@ export const orderService = {
       });
       
       
-      // Đơn hàng thành công - cập nhật số lượng tồn kho ở phía client
-      if (response && response.data?.orderId) {
-        // Lấy userId từ localStorage để lưu đơn hàng
-        let username = '';
-        const userData = localStorage.getItem('user');
-        if (userData) {
-          try {
-            const user = JSON.parse(userData);
-            username = user.name || user.email || '';
-          } catch (e) {}
-        }
-        // Lưu đơn hàng mới vào localStorage (as Order, not OrderResponse)
-        this.saveNewOrder({
-          id: response.data.orderId.toString(),
-          userId: username,
-          items: cartItems,
-          total: response.data.totalAmount || cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0),
-          status: response.data.status as 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled',
-          shippingAddress: {
-            firstName: 'N/A',
-            lastName: 'N/A',
-            email: username,
-            phone: 'N/A',
-            address: orderData.shippingAddress,
-            city: 'N/A',
-            zipCode: 'N/A'
-          },
-          createdAt: response.data.orderDate ? new Date(response.data.orderDate).toISOString() : new Date().toISOString(),
-          updatedAt: response.data.orderDate ? new Date(response.data.orderDate).toISOString() : new Date().toISOString()
-        });
-      }
+      // Không lưu đơn hàng vào localStorage nữa; backend là nguồn dữ liệu chính
 
       return response.data!;
     } catch (error) {
-      
-      
-      // Fallback: Tạo đơn hàng giả để ứng dụng có thể tiếp tục hoạt động
-      const mockOrderId = 'local-' + Date.now();
-      const total = cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0);
-      const createdAt = new Date().toISOString();
-      
-      // Lấy userId từ localStorage
-      let userId = '1'; // fallback
-      const userData = localStorage.getItem('user');
-      if (userData) {
-        try {
-          const user = JSON.parse(userData);
-          userId = user.userId?.toString() || user.email || '1';
-        } catch (e) {
-          
-        }
-      }
-      
-      // Tạo shippingAddress object từ string để lưu vào localStorage
-      const shippingAddressObj = {
-        firstName: 'N/A',
-        lastName: 'N/A', 
-        email: cartItems.length > 0 ? cartItems[0].product.brand : '',
-        phone: 'N/A',
-        address: orderData.shippingAddress,
-        city: 'N/A',
-        zipCode: 'N/A'
-      };
-      
-      // Tạo đơn hàng cho local storage
-      const newOrder: Order = {
-        id: mockOrderId,
-        userId: userId,
-        items: cartItems,
-        total: total,
-        status: 'pending',
-        shippingAddress: shippingAddressObj,
-        createdAt: createdAt,
-        updatedAt: createdAt
-      };
-      
-      // Lưu đơn hàng mới vào localStorage
-      this.saveNewOrder(newOrder);
-      
-      // Tạo response để trả về cho người gọi (OrderResponse)
-      const mockOrderResponse: OrderResponse = {
-        orderId: Number(mockOrderId),
-        userId: 1,
-        username: 'Offline User',
-        orderDate: new Date(createdAt),
-        status: 'pending',
-        totalAmount: total,
-        paymentStatus: 'pending',
-        paymentMethod: orderData.paymentMethod || 'cash_on_delivery',
-        shippingAddress: orderData.shippingAddress,
-        items: orderData.items.map((item, idx) => {
-          const matchingItem = cartItems.find(i => parseInt(i.product.id) === item.productId);
-          const price = matchingItem ? matchingItem.product.price : 0;
-          return {
-            orderItemId: idx + 1,
-            productId: item.productId,
-            productName: matchingItem ? matchingItem.product.name : '',
-            imageUrl: matchingItem ? matchingItem.product.image : '',
-            quantity: item.quantity,
-            price: price,
-            subtotal: price * item.quantity
-          };
-        }),
-        email: '',
-        phone: ''
-      };
-      return mockOrderResponse;
+      // Fallback offline: ném lỗi để UI xử lý (có thể bổ sung mock nếu muốn hiển thị tạm)
+      throw error;
     }
   },
-  
-  // Phương thức bổ sung để lưu đơn hàng mới vào localStorage
-  saveNewOrder(order: Order) {
-    const savedOrders = getSavedOrders();
-    savedOrders.unshift(order); // Thêm đơn hàng mới vào đầu danh sách
-    saveOrdersToStorage(savedOrders);
-  },
+
 
   async updateOrderStatus(id: number, status: OrderResponse['status']) {
     const response = await http<ApiResponse<OrderResponse>>(`/api/OrderTable/${id}/${status}`, {

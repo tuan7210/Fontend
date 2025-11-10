@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { getCurrentCustomer } from '../services/userService';
@@ -21,9 +21,10 @@ const CashOnDeliveryConfirm: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  // Load checkout items and payment method from localStorage if they exist
-  const [checkoutItems, setCheckoutItems] = useState(items);
-  const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
+  // Nhận phương thức thanh toán từ route state thay vì localStorage
+  const location = useLocation();
+  const routeState = (location.state as any) || {};
+  const paymentMethod: 'cod' | 'online' = routeState.paymentMethod === 'online' ? 'online' : 'cod';
   
   useEffect(() => {
     // Ưu tiên lấy thông tin cá nhân từ API nếu đã đăng nhập
@@ -46,18 +47,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
     };
     fetchCustomerInfo();
 
-    // Load stored items
-    const storedItems = localStorage.getItem('checkoutItems');
-    if (storedItems) {
-      try {
-        setCheckoutItems(JSON.parse(storedItems));
-      } catch (e) {}
-    }
-    // Load payment method
-    const storedPaymentMethod = localStorage.getItem('paymentMethod');
-    if (storedPaymentMethod === 'online' || storedPaymentMethod === 'cod') {
-      setPaymentMethod(storedPaymentMethod);
-    }
   }, [user]);
 
   const handleConfirm = async (e: React.FormEvent) => {
@@ -73,8 +62,8 @@ const CashOnDeliveryConfirm: React.FC = () => {
         setTimeout(() => navigate('/login'), 2000);
         return;
       }
-      // Get items either from cart or from localStorage
-      const orderItems = checkoutItems.length > 0 ? checkoutItems : items;
+  // Lấy sản phẩm trực tiếp từ context (đã đồng bộ với backend)
+  const orderItems = items;
       if (orderItems.length === 0) {
         setError("Không có sản phẩm nào trong đơn hàng");
         setIsProcessing(false);
@@ -91,18 +80,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
           paymentMethod: 'online'
         };
         const response = await orderService.createOrder(orderRequest);
-        // Lưu orderId vào localStorage để trang checkout-online có thể lấy lại nếu reload
-        localStorage.setItem('lastOrderId', String(response.orderId));
-        localStorage.removeItem('checkoutItems');
-        localStorage.removeItem('checkoutTotal');
-        // Chuyển sang trang checkout-online, truyền orderId và info để hiển thị QR
-        navigate('/checkout-online', {
-          state: {
-            orderId: response.orderId,
-            items: orderItems,
-            total: response.totalAmount || getTotalPrice() * 1.08
-          }
-        });
+        navigate(`/checkout-online?orderId=${response.orderId}`);
         return;
       }
       // Nếu là COD thì giữ nguyên logic đặt hàng
@@ -116,8 +94,6 @@ const CashOnDeliveryConfirm: React.FC = () => {
       };
       const response = await orderService.createOrder(orderRequest);
       // Đơn hàng tạo thành công nếu không có lỗi
-      localStorage.removeItem('checkoutItems');
-      localStorage.removeItem('checkoutTotal');
       await handleOrderSuccess();
       setConfirmed(true);
       setTimeout(() => {
@@ -147,7 +123,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
           {/* Thông tin đơn hàng rõ ràng */}
           <div className="mb-6 bg-green-50 rounded-xl p-4 text-left border border-green-100">
             <div className="font-bold text-green-700 mb-4 text-xl">Thông tin đơn hàng</div>
-            {(checkoutItems.length === 0 && items.length === 0) ? (
+            {(items.length === 0) ? (
               <div className="text-gray-500">Không có sản phẩm nào trong đơn hàng.</div>
             ) : (
               <div className="overflow-x-auto">
@@ -161,7 +137,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(checkoutItems.length > 0 ? checkoutItems : items).map(item => (
+                    {items.map(item => (
                       <tr key={item.id} className="border-b border-green-100">
                         <td className="py-2 px-2 font-medium text-gray-800">{item.product.name}</td>
                         <td className="py-2 px-2 text-center">
@@ -175,11 +151,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
                   <tfoot>
                     <tr className="bg-green-100">
                       <td className="py-2 px-2 font-bold text-green-700 text-right" colSpan={3}>Tổng cộng:</td>
-                      <td className="py-2 px-2 text-right font-bold text-green-700">{
-                        localStorage.getItem('checkoutTotal') ? 
-                        Number(localStorage.getItem('checkoutTotal')).toLocaleString() : 
-                        (getTotalPrice() * 1.08).toLocaleString()
-                      } đ</td>
+                      <td className="py-2 px-2 text-right font-bold text-green-700">{(getTotalPrice() * 1.08).toLocaleString()} đ</td>
                     </tr>
                   </tfoot>
                 </table>

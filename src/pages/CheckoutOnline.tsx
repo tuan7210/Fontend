@@ -6,7 +6,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import Button from '../components/UI/Button';
 import { orderService } from '../services/orderService';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
-import { AlertCircle, Package, User, Phone, Home } from 'lucide-react';
+import { AlertCircle, Package } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
 
@@ -14,8 +14,10 @@ const CheckoutOnline: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const state = (location.state as any) || {};
-  const [orderId, setOrderId] = useState<number | null>(state.orderId || Number(localStorage.getItem('lastOrderId')) || null);
-  const [shipping, setShipping] = useState('');
+  // Ưu tiên lấy orderId từ query param để hỗ trợ reload mà không cần localStorage
+  const searchParams = new URLSearchParams(location.search);
+  const orderIdFromQuery = searchParams.get('orderId');
+  const [orderId] = useState<number | null>(state.orderId || (orderIdFromQuery ? Number(orderIdFromQuery) : null));
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
@@ -24,7 +26,6 @@ const CheckoutOnline: React.FC = () => {
   const [total, setTotal] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
   const { handleOrderSuccess } = useCart();
 
   // Luôn lấy thông tin đơn hàng từ backend theo orderId
@@ -37,11 +38,9 @@ const CheckoutOnline: React.FC = () => {
       setIsProcessing(true);
       setError(null);
       try {
-        const order = await orderService.getOrderById(orderId);
-        setShipping(order.shippingAddress || '');
+  const order = await orderService.getOrderById(orderId);
         setItems(order.items || []);
         setTotal(order.totalAmount || 0);
-        setSuccess(true);
         // Nếu backend trả về shippingAddress dạng chuỗi, cố gắng parse để lấy tên, sđt, địa chỉ
         if (order.shippingAddress) {
           // Giả định shippingAddress: "Tên, SĐT, Địa chỉ, Thành phố, Zip"

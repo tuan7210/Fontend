@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Order } from '../types';
+import { Order, OrderResponse } from '../types';
 import { orderService } from '../services/orderService';
 import { CheckCircle2, Clock, Truck, XCircle, AlertTriangle, ArrowLeft } from 'lucide-react';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
@@ -35,7 +35,7 @@ const OrderDetail: React.FC = () => {
       
       setLoading(true);
       try {
-        const orderData = await orderService.getOrderById(id);
+  const orderData: OrderResponse = await orderService.getOrderById(id);
         
         // Map OrderResponse -> Order chuẩn cho UI
         if (orderData) {
@@ -202,14 +202,14 @@ const OrderDetail: React.FC = () => {
                         onClick={() => {
                           if (window.confirm('Bạn có chắc chắn muốn hủy đơn hàng này không?')) {
                             // Gọi API hủy đơn hàng
-                            orderService.updateOrderStatus(order.id, 'cancelled')
+                            orderService.updateOrderStatus(Number(order.id), 'cancelled')
                               .then(updatedOrder => {
                                 if (updatedOrder) {
                                   setOrder({...order, status: 'cancelled', updatedAt: new Date().toISOString()});
                                   alert('Đơn hàng đã được hủy thành công');
                                 }
                               })
-                              .catch(error => {
+                              .catch(() => {
                                 alert('Không thể hủy đơn hàng. Vui lòng thử lại sau.');
                               });
                           }

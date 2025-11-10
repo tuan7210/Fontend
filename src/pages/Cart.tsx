@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+// Nếu bạn bị lỗi đỏ ở dòng này, có thể do axios chưa được cài đặt trong project.
+// Chạy lệnh: npm install axios
+import axios from 'axios';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, AlertCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -13,12 +16,15 @@ const Cart: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'cod' | 'online'>('cod');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outOfStock, setOutOfStock] = useState<
+    { productId: number; productName: string; message: string }[]
+  >([]);
 
-  const handleQuantityChange = (productId: string, newQuantity: number) => {
+  const handleQuantityChange = async (productId: string, newQuantity: number) => {
     if (newQuantity <= 0) {
-      removeItem(productId);
+      await removeItem(productId);
     } else {
-      updateQuantity(productId, newQuantity);
+      await updateQuantity(productId, newQuantity);
     }
   };
 
@@ -30,15 +36,23 @@ const Cart: React.FC = () => {
     try {
       setIsProcessing(true);
       setError(null);
-      // Store cart items and payment method in localStorage for the next page
-      localStorage.setItem('checkoutItems', JSON.stringify(items));
-      localStorage.setItem('checkoutTotal', String(getTotalPrice() * 1.08));
-      localStorage.setItem('paymentMethod', paymentMethod);
-      // Always go to confirm page first
-      navigate('/cash-on-delivery-confirm');
+      setOutOfStock([]);
+      // Gửi danh sách sản phẩm lên API kiểm tra tồn kho
+      const cartCheck = items.map((item) => ({
+        productId: Number(item.product.id),
+        quantity: item.quantity,
+      }));
+      const res = await axios.post('/api/Order/check-cart-stock', cartCheck);
+      if (res.data && res.data.success) {
+        // Điều hướng sang trang xác nhận, truyền phương thức thanh toán qua route state
+        navigate('/cash-on-delivery-confirm', { state: { paymentMethod } });
+      } else {
+        setError(res.data.message || 'Một số sản phẩm trong giỏ hàng đã hết hàng hoặc không đủ số lượng');
+        setOutOfStock(res.data.outOfStock || []);
+      }
     } catch (error) {
       setError(typeof error === 'string' ? error : 
-        error instanceof Error ? error.message : 'Đã có lỗi xảy ra khi xử lý đơn hàng');
+        error instanceof Error ? error.message : 'Đã có lỗi xảy ra khi kiểm tra tồn kho');
     } finally {
       setIsProcessing(false);
     }
@@ -102,8 +116,9 @@ const Cart: React.FC = () => {
                       <span className="px-4 py-2 border-x border-gray-300">{item.quantity}</span>
                       <button
                         onClick={() => handleQuantityChange(item.product.id, item.quantity + 1)}
-                        disabled={item.quantity >= item.product.stock}
+                        disabled={item.quantity >= item.product.stock || item.product.stock === 0}
                         className="p-2 hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={item.product.stock === 0 ? 'Sản phẩm đã hết hàng' : item.quantity >= item.product.stock ? 'Đã đạt số lượng tối đa tồn kho' : ''}
                       >
                         <Plus className="w-4 h-4" />
                       </button>
@@ -116,6 +131,11 @@ const Cart: React.FC = () => {
                       <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
+                  {item.product.stock === 0 && (
+                    <div className="text-xs text-red-600 mt-2 font-semibold bg-red-50 border border-red-200 rounded px-2 py-1">
+                      <span className="mr-1">⚠️</span>Sản phẩm này đã hết hàng. Vui lòng xóa khỏi giỏ hoặc chọn sản phẩm khác.
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -189,9 +209,20 @@ const Cart: React.FC = () => {
                 </div>
               </div>
               {error && (
-                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg flex items-center border border-red-200">
-                  <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
-                  <span>{error}</span>
+                <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg border border-red-200">
+                  <div className="flex items-center mb-1">
+                    <AlertCircle className="w-5 h-5 mr-2 flex-shrink-0" />
+                    <span>{error}</span>
+                  </div>
+                  {outOfStock.length > 0 && (
+                    <ul className="list-disc pl-6 text-sm">
+                      {outOfStock.map((item) => (
+                        <li key={item.productId}>
+                          <span className="font-semibold">{item.productName}:</span> {item.message}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               )}
               <Button 
