@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 // Nếu bạn bị lỗi đỏ ở dòng này, có thể do axios chưa được cài đặt trong project.
 // Chạy lệnh: npm install axios
-import axios from 'axios';
+// Dùng orderService để đảm bảo baseURL + Authorization header chính xác
+import { orderService } from '../services/orderService';
 import { Link, useNavigate } from 'react-router-dom';
 import { Trash2, Plus, Minus, ShoppingBag, ArrowRight, AlertCircle } from 'lucide-react';
 import { useCart } from '../context/CartContext';
@@ -42,13 +43,13 @@ const Cart: React.FC = () => {
         productId: Number(item.product.id),
         quantity: item.quantity,
       }));
-      const res = await axios.post('/api/Order/check-cart-stock', cartCheck);
-      if (res.data && res.data.success) {
+      const res = await orderService.checkCartStock(cartCheck);
+      if (res && res.success) {
         // Điều hướng sang trang xác nhận, truyền phương thức thanh toán qua route state
         navigate('/cash-on-delivery-confirm', { state: { paymentMethod } });
       } else {
-        setError(res.data.message || 'Một số sản phẩm trong giỏ hàng đã hết hàng hoặc không đủ số lượng');
-        setOutOfStock(res.data.outOfStock || []);
+        setError(res?.message || 'Một số sản phẩm trong giỏ hàng đã hết hàng hoặc không đủ số lượng');
+        setOutOfStock(res?.outOfStock || []);
       }
     } catch (error) {
       setError(typeof error === 'string' ? error : 

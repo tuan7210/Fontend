@@ -15,8 +15,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
-  const [city] = useState('Hà Nội');
-  const [zipCode] = useState('10000');
+  // city, zipCode không còn cần nếu shippingAddress chỉ là một chuỗi địa chỉ đầy đủ
   const [confirmed, setConfirmed] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +53,12 @@ const CashOnDeliveryConfirm: React.FC = () => {
     try {
       setIsProcessing(true);
       setError(null);
+      const cleanAddress = (address || '').trim();
+      if (!cleanAddress) {
+        setError('Vui lòng nhập địa chỉ nhận hàng');
+        setIsProcessing(false);
+        return;
+      }
       // Check authentication first
       const token = localStorage.getItem('token');
       if (!token) {
@@ -76,7 +81,9 @@ const CashOnDeliveryConfirm: React.FC = () => {
             productId: parseInt(item.product.id),
             quantity: item.quantity
           })),
-          shippingAddress: `${name}, ${phone}, ${address}, ${city}, ${zipCode}`,
+          // Backend mẫu chỉ cần địa chỉ thuần: "Số 1 Nguyễn Trãi, Quận 1, TP.HCM"
+          // Người dùng phải nhập đầy đủ địa chỉ vào ô address.
+          shippingAddress: cleanAddress,
           paymentMethod: 'online'
         };
         const response = await orderService.createOrder(orderRequest);
@@ -89,7 +96,8 @@ const CashOnDeliveryConfirm: React.FC = () => {
           productId: parseInt(item.product.id),
           quantity: item.quantity
         })),
-        shippingAddress: `${name}, ${phone}, ${address}, ${city}, ${zipCode}`,
+        // Gửi đúng format backend yêu cầu: chỉ địa chỉ
+        shippingAddress: cleanAddress,
         paymentMethod: 'cash_on_delivery'
       };
       const response = await orderService.createOrder(orderRequest);
@@ -175,6 +183,18 @@ const CashOnDeliveryConfirm: React.FC = () => {
               )}
             </div>
           )}
+          <div className="text-left">
+            <label className="block text-sm font-medium text-blue-700 mb-1">Địa chỉ nhận hàng</label>
+            <input
+              type="text"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+              placeholder="Ví dụ: Số 1 Nguyễn Trãi, Quận 1, TP.HCM"
+              required
+              className="w-full px-3 py-2 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400"
+            />
+            <p className="text-xs text-gray-500 mt-1">Vui lòng nhập đầy đủ số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố.</p>
+          </div>
           
           <Button 
             type="submit" 

@@ -306,8 +306,8 @@ export const orderService = {
       };
       
       
-      // Real API call to create order and update stock
-      const response = await http<ApiResponse<OrderResponse>>('/api/Order', {
+      // Real API call to create order and update stock (backend: POST /api/OrderTable)
+      const response = await http<ApiResponse<OrderResponse>>('/api/OrderTable', {
         method: 'POST',
         body: JSON.stringify(payload),
       });
@@ -341,5 +341,38 @@ export const orderService = {
       throw new Error(response.message || 'Xác nhận thanh toán thất bại');
     }
     return response.data;
+  },
+
+  // Kiểm tra tồn kho giỏ hàng trước khi thanh toán
+  async checkCartStock(cartItems: Array<{ productId: number; quantity: number }>): Promise<{ success: boolean; message?: string; outOfStock?: Array<{ productId: number; productName: string; message: string }> }> {
+    try {
+      const raw = await http<any>('/api/Order/check-cart-stock', {
+        method: 'POST',
+        body: JSON.stringify(cartItems)
+      });
+      // Trường hợp backend dùng ApiResponse
+      if (raw && typeof raw.success === 'boolean') {
+        // Nếu có wrapper success/outOfStock trực tiếp
+        return {
+          success: raw.success,
+          message: raw.message,
+          outOfStock: raw.outOfStock || raw.data?.outOfStock || []
+        };
+      }
+      // Trường hợp trả về { success, data: { outOfStock } }
+      if (raw?.data && typeof raw.data.success === 'boolean') {
+        return {
+          success: raw.data.success,
+          message: raw.data.message,
+          outOfStock: raw.data.outOfStock || []
+        };
+      }
+      // Fallback: coi như thất bại nếu không đúng format
+      return { success: false, message: 'Phản hồi kiểm tra tồn kho không hợp lệ.' };
+    } catch (e: any) {
+      const msg = e?.message || 'Lỗi khi kiểm tra tồn kho';
+      // Trả về dạng thất bại để UI hiển thị
+      return { success: false, message: msg };
+    }
   }
 };
