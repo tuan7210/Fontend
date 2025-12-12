@@ -7,6 +7,7 @@ import ProductCard from '../components/Product/ProductCard';
 import LoadingSpinner from '../components/UI/LoadingSpinner';
 import Button from '../components/UI/Button';
 import { useReload } from '../context/ReloadContext';
+import ChatBox from '../components/UI/ChatBox';
 
 const Home: React.FC = () => {
   const location = useLocation();
@@ -170,7 +171,8 @@ const Home: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-  {/* ...existing code... */}
+      {/* AI ChatBox - Floating */}
+      <ChatBox />
 
       {/* Hero Section - Cải tiến với bố cục 2 cột và hiệu ứng */}
       <section className="bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 text-white py-16 md:py-20 lg:py-24 relative overflow-hidden">
