@@ -175,7 +175,7 @@ const Home: React.FC = () => {
       <ChatBox />
 
       {/* Hero Section - Cải tiến với bố cục 2 cột và hiệu ứng */}
-      <section className="bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 text-white py-16 md:py-20 lg:py-24 relative overflow-hidden">
+      <section className="bg-gradient-to-r from-blue-600 via-blue-500 to-purple-600 text-white py-12 md:py-16 lg:py-20 relative overflow-hidden">
         {/* Hiệu ứng hình học nền */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-0 left-0 w-72 h-72 bg-white rounded-full mix-blend-overlay blur-3xl"></div>
@@ -185,16 +185,16 @@ const Home: React.FC = () => {
         <div className="container mx-auto px-4 relative z-10">
           <div className="flex flex-col md:flex-row items-center justify-between gap-8 md:gap-12">
             <div className="max-w-xl">
-              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 leading-tight animate-fade-in">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold mb-5 leading-tight animate-fade-in">
                 Khám phá <span className="bg-clip-text text-transparent bg-gradient-to-r from-yellow-200 to-yellow-400">công nghệ</span> mới nhất
               </h1>
-              <p className="text-lg md:text-xl mb-8 opacity-90 leading-relaxed">
+              <p className="text-base md:text-lg mb-6 opacity-90 leading-relaxed">
                 Từ laptop hiện đại đến smartphone mới nhất, TechStore cung cấp những sản phẩm tốt nhất với giá cả cạnh tranh nhất.
               </p>
               <div className="flex">
                 <Button
                   size="lg"
-                  className="bg-gradient-to-r from-amber-400 to-amber-600 text-white hover:from-amber-500 hover:to-amber-700 shadow-xl border-0 px-10 py-4 font-bold text-lg relative overflow-hidden group transition-all duration-300 transform hover:scale-105"
+                  className="bg-gradient-to-r from-amber-400 to-amber-600 text-white hover:from-amber-500 hover:to-amber-700 shadow-xl border-0 px-8 py-3 font-bold text-base relative overflow-hidden group transition-all duration-300 transform hover:scale-105"
                   onClick={() => {
                     // Cuộn xuống phần sản phẩm
                     // Nếu đang trong chế độ tìm kiếm, tắt tìm kiếm để hiển thị sản phẩm nổi bật
@@ -254,15 +254,15 @@ const Home: React.FC = () => {
       
       {/* Bộ lọc và tìm kiếm sản phẩm - Cải tiến thiết kế */}
       <section className="container mx-auto px-4 pt-4 pb-2">
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-4 border border-blue-100 transform -translate-y-2 relative z-20">
-            <div className="flex items-center justify-between mb-6">
+        <div className="bg-white rounded-2xl shadow-lg p-6 mb-4 border border-blue-100 transform -translate-y-2 relative z-20">
+            <div className="flex items-center justify-between mb-5">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                   </svg>
                 </div>
-                <h2 className="text-2xl font-bold text-blue-800">Tìm kiếm thông minh</h2>
+                <h2 className="text-xl font-bold text-blue-800">Tìm kiếm thông minh</h2>
               </div>
               <span className="text-sm text-gray-500">Tìm thấy <strong className="text-blue-600">{filteredProducts.length}</strong> sản phẩm</span>
             </div>          <form
@@ -281,9 +281,9 @@ const Home: React.FC = () => {
                 placeholder="Bạn đang tìm sản phẩm gì?"
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-blue-100 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 transition-all text-lg"
+                className="w-full pl-10 pr-4 py-2.5 rounded-xl border-2 border-blue-100 focus:border-blue-400 focus:ring-2 focus:ring-blue-200 transition-all text-base"
               />
-              <Button type="submit" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg">
+              <Button type="submit" className="absolute right-2 top-1/2 transform -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-1.5 px-5 rounded-lg text-sm">
                 Tìm kiếm
               </Button>
             </div>
@@ -379,7 +379,7 @@ const Home: React.FC = () => {
 
       {/* Kết quả tìm kiếm - Hiển thị khi người dùng tìm kiếm */}
       {isSearchActive && (
-        <section id="featured-products" className="py-10 md:py-14 lg:py-16" ref={searchResultsRef}>
+        <section id="featured-products" className="py-8 md:py-10 lg:py-12" ref={searchResultsRef}>
           <div className="container mx-auto px-4">
             <div className="flex items-center justify-between mb-8 md:mb-10">
               <div className="flex items-center gap-3">
@@ -481,7 +481,7 @@ const Home: React.FC = () => {
 
       {/* Featured Products - Hiển thị khi không tìm kiếm */}
       {!isSearchActive && (
-        <section id="featured-products" className="py-10 md:py-14 lg:py-16 bg-white">
+        <section id="featured-products" className="py-8 md:py-10 lg:py-12 bg-white">
           <div className="container mx-auto px-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 md:mb-12 gap-4">
               <h2 className="text-2xl md:text-3xl font-bold">Sản phẩm nổi bật</h2>
@@ -496,7 +496,7 @@ const Home: React.FC = () => {
       )}
 
       {/* New Arrivals */}
-      <section className="py-10 md:py-14 lg:py-16">
+      <section className="py-8 md:py-10 lg:py-12">
         <div className="container mx-auto px-4">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 md:mb-12 gap-4">
             <h2 className="text-2xl md:text-3xl font-bold">Hàng mới về</h2>
@@ -510,28 +510,28 @@ const Home: React.FC = () => {
       </section>
 
       {/* Stats */}
-      <section className="py-10 md:py-14 lg:py-16 bg-gray-900 text-white">
+      <section className="py-8 md:py-10 lg:py-12 bg-gray-900 text-white">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 text-center">
-            <div className="rounded-xl bg-gray-800 p-6 shadow">
-              <div className="flex items-center justify-center mb-4">
-                <TrendingUp className="w-10 h-10 md:w-12 md:h-12 text-blue-400" />
+            <div className="rounded-xl bg-gray-800 p-5 shadow">
+              <div className="flex items-center justify-center mb-3">
+                <TrendingUp className="w-8 h-8 md:w-10 md:h-10 text-blue-400" />
               </div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">10,000+</h3>
-              <p className="text-gray-400">Khách hàng hài lòng</p>
+              <h3 className="text-xl md:text-2xl font-bold mb-2">10,000+</h3>
+              <p className="text-gray-400 text-sm">Khách hàng hài lòng</p>
             </div>
-            <div className="rounded-xl bg-gray-800 p-6 shadow">
-              <div className="flex items-center justify-center mb-4">
-                <Star className="w-10 h-10 md:w-12 md:h-12 text-yellow-400" />
+            <div className="rounded-xl bg-gray-800 p-5 shadow">
+              <div className="flex items-center justify-center mb-3">
+                <Star className="w-8 h-8 md:w-10 md:h-10 text-yellow-400" />
               </div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">4.9/5</h3>
-              <p className="text-gray-400">Đánh giá khách hàng</p>
+              <h3 className="text-xl md:text-2xl font-bold mb-2">4.9/5</h3>
+              <p className="text-gray-400 text-sm">Đánh giá khách hàng</p>
             </div>
-            <div className="rounded-xl bg-gray-800 p-6 shadow">
-              <div className="flex items-center justify-center mb-4">
-                <Smartphone className="w-10 h-10 md:w-12 md:h-12 text-green-400" />
+            <div className="rounded-xl bg-gray-800 p-5 shadow">
+              <div className="flex items-center justify-center mb-3">
+                <Smartphone className="w-8 h-8 md:w-10 md:h-10 text-green-400" />
               </div>
-              <h3 className="text-2xl md:text-3xl font-bold mb-2">1,000+</h3>
+              <h3 className="text-xl md:text-2xl font-bold mb-2">1,000+</h3>
               <p className="text-gray-400">Sản phẩm có sẵn</p>
             </div>
           </div>
@@ -539,10 +539,10 @@ const Home: React.FC = () => {
       </section>
 
       {/* Newsletter */}
-      <section className="py-10 md:py-14 lg:py-16 bg-blue-600 text-white">
+      <section className="py-8 md:py-10 lg:py-12 bg-blue-600 text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-2 md:mb-4">Nhận thông tin mới nhất</h2>
-          <p className="text-base md:text-xl mb-6 md:mb-8 opacity-90">
+          <h2 className="text-xl md:text-2xl font-bold mb-2 md:mb-3">Nhận thông tin mới nhất</h2>
+          <p className="text-sm md:text-base mb-5 md:mb-6 opacity-90">
             Nhận ưu đãi và cập nhật sản phẩm mới qua email của bạn
           </p>
           <div className="max-w-md mx-auto flex">
