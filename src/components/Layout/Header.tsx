@@ -60,11 +60,10 @@ const Header: React.FC = () => {
                 }
               }}
             >
-              Home
             </Link>
             <div className="relative group">
               <button className="text-gray-700 hover:text-blue-600 transition-colors">
-                Categories
+                Danh mục
               </button>
               <div className="absolute top-full left-0 mt-2 w-48 bg-white rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                 {categories.map((category) => {
@@ -106,7 +105,7 @@ const Header: React.FC = () => {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
+                placeholder="Bạn muốn mua gì hôm nay ?"
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -159,7 +158,7 @@ const Header: React.FC = () => {
                       }}
                       className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-red-600 transition-colors font-semibold"
                     >
-                      Logout
+                      Đăng xuất
                     </button>
                   </div>
                 </div>
@@ -169,7 +168,7 @@ const Header: React.FC = () => {
                 to="/login"
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
               >
-                Login
+                Đăng nhập
               </Link>
             )}
 
@@ -213,7 +212,6 @@ const Header: React.FC = () => {
                 }
               }}
             >
-              Home
             </Link>
             {categories.map((category) => {
               const categorySlug = category.path.split('=')[1];
