@@ -2,6 +2,17 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, DollarSign, ShoppingCart, TrendingUp, Eye } from 'lucide-react';
 import { http } from '../../services/orderService';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  BarChart,
+  Bar
+} from 'recharts';
 
 type PaidOrder = {
   orderId: string | number;
@@ -57,6 +68,10 @@ const AdminDashboard = () => {
   const [orderCount, setOrderCount] = useState(0);
   const [paidOrders, setPaidOrders] = useState<PaidOrder[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Chart series state
+  const [seriesData, setSeriesData] = useState<Array<{ label: string; value: number }>>([]);
+  const [seriesLoading, setSeriesLoading] = useState(false);
 
   // Fetch revenue, order count, paid orders
   useEffect(() => {
@@ -138,6 +153,54 @@ const AdminDashboard = () => {
     };
     fetchData();
     return () => { isMounted = false; };
+  }, [activeTab, selectedDate, selectedMonth, selectedYear]);
+
+  // Fetch revenue series for chart
+  useEffect(() => {
+    const fetchSeries = async () => {
+      try {
+        setSeriesLoading(true);
+        let url = '';
+        if (activeTab === 'day') {
+          // Default: show past 7 days including selectedDate
+          const end = new Date(selectedDate);
+          const start = new Date(selectedDate);
+          start.setDate(start.getDate() - 6);
+          const startStr = start.toISOString().split('T')[0];
+          const endStr = end.toISOString().split('T')[0];
+          url = `/api/Order/revenue-series?granularity=day&start=${startStr}&end=${endStr}`;
+          const res = await http<any>(url);
+          const points = (res.data || []).map((d: any) => ({
+            label: d.date,
+            value: Number(d.totalRevenue || 0)
+          }));
+          setSeriesData(points);
+        } else if (activeTab === 'month') {
+          url = `/api/Order/revenue-series?granularity=month&year=${selectedYear}`;
+          const res = await http<any>(url);
+          const points = (res.data || []).map((d: any) => ({
+            label: String(d.month).padStart(2, '0') + '/' + String(selectedYear),
+            value: Number(d.totalRevenue || 0)
+          }));
+          setSeriesData(points);
+        } else if (activeTab === 'year') {
+          const startYear = selectedYear - 5;
+          const endYear = selectedYear;
+          url = `/api/Order/revenue-series?granularity=year&start=${startYear}&end=${endYear}`;
+          const res = await http<any>(url);
+          const points = (res.data || []).map((d: any) => ({
+            label: String(d.year),
+            value: Number(d.totalRevenue || 0)
+          }));
+          setSeriesData(points);
+        }
+      } catch (e) {
+        setSeriesData([]);
+      } finally {
+        setSeriesLoading(false);
+      }
+    };
+    fetchSeries();
   }, [activeTab, selectedDate, selectedMonth, selectedYear]);
 
   return (
@@ -250,6 +313,44 @@ const AdminDashboard = () => {
                 </select>
               )}
             </div>
+          </div>
+        </div>
+
+        {/* Revenue Chart */}
+        <div className="bg-white rounded-lg shadow mb-8">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Biểu đồ doanh thu {activeTab === 'day' ? 'theo ngày (7 ngày gần nhất)' : activeTab === 'month' ? `theo tháng (${selectedYear})` : `theo năm (${selectedYear - 5}–${selectedYear})`}
+            </h3>
+          </div>
+          <div className="p-6">
+            {seriesLoading ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">Đang tải dữ liệu biểu đồ...</div>
+            ) : seriesData.length === 0 ? (
+              <div className="h-64 flex items-center justify-center text-gray-500">Không có dữ liệu để hiển thị.</div>
+            ) : (
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  {activeTab === 'day' ? (
+                    <LineChart data={seriesData} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={(v) => formatCurrency(Number(v)).replace('₫', '')} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(v: any) => formatCurrency(Number(v))} labelFormatter={(l: any) => l} />
+                      <Line type="monotone" dataKey="value" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} />
+                    </LineChart>
+                  ) : (
+                    <BarChart data={seriesData} margin={{ top: 16, right: 24, left: 8, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                      <YAxis tickFormatter={(v) => formatCurrency(Number(v)).replace('₫', '')} tick={{ fontSize: 12 }} />
+                      <Tooltip formatter={(v: any) => formatCurrency(Number(v))} labelFormatter={(l: any) => l} />
+                      <Bar dataKey="value" fill="#10b981" radius={[6, 6, 0, 0]} />
+                    </BarChart>
+                  )}
+                </ResponsiveContainer>
+              </div>
+            )}
           </div>
         </div>
 

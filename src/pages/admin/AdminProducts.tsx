@@ -253,6 +253,9 @@ const AdminProducts: React.FC = () => {
   const handleOpenEditModal = async (productId: string) => {
     setLoading(true);
     setErrorMsg('');
+    // Reset preview và file trước khi mở modal để tránh hiển thị ảnh cũ
+    setPreviewUrl('');
+    setSelectedFile(null);
     
     try {
       // Lấy chi tiết sản phẩm từ API
@@ -364,9 +367,14 @@ const AdminProducts: React.FC = () => {
       // Reload sản phẩm sau khi tạo/cập nhật
       await loadProducts();
 
-      // Đóng modal sau khi hiển thị thông báo thành công
+      // Đóng modal sau khi hiển thị thông báo thành công và dọn state
       setTimeout(() => {
         setShowModal(false);
+        setSelectedFile(null);
+        setPreviewUrl('');
+        setEditingProduct(null);
+        setSpecificationKeys([]);
+        setSpecificationValues([]);
       }, 1000);
 
     } catch (error) {
@@ -833,7 +841,18 @@ const AdminProducts: React.FC = () => {
       {/* Modal Thêm/Sửa sản phẩm */}
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 overflow-y-auto py-10">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto relative">
+            {/* Nút X đóng modal */}
+            <button
+              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 transition-colors p-1"
+              onClick={() => { setShowModal(false); setSelectedFile(null); setPreviewUrl(''); setEditingProduct(null); setSpecificationKeys([]); setSpecificationValues([]); }}
+              title="Đóng"
+              aria-label="Đóng"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
             <h2 className="text-xl font-bold mb-4 text-blue-700">
               {modalMode === 'create' ? 'Thêm sản phẩm mới' : 'Chỉnh sửa sản phẩm'}
             </h2>
@@ -1048,7 +1067,7 @@ const AdminProducts: React.FC = () => {
             <div className="flex justify-end gap-3 mt-6 border-t pt-4">
               <Button
                 className="px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300"
-                onClick={() => setShowModal(false)}
+                onClick={() => { setShowModal(false); setSelectedFile(null); setPreviewUrl(''); setEditingProduct(null); setSpecificationKeys([]); setSpecificationValues([]); }}
               >
                 Hủy
               </Button>

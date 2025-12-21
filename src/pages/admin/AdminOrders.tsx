@@ -6,6 +6,7 @@ import { ShoppingCart, Search, Eye, Truck, CheckCircle2, XCircle, Clock, AlertTr
 import { orderService } from '../../services/orderService';
 import Button from '../../components/UI/Button';
 import LoadingSpinner from '../../components/UI/LoadingSpinner';
+const API_BASE = (import.meta as any).env?.VITE_API_URL || 'http://localhost:5032';
 
 const AdminOrders: React.FC = () => {
   const [orders, setOrders] = useState<OrderResponse[]>([]);
@@ -301,11 +302,18 @@ const AdminOrders: React.FC = () => {
                       <tr key={index} className="border-t">
                         <td className="py-3 px-4 font-medium">{item.productName}</td>
                         <td className="py-3 px-4 text-center">
-                          <img 
-                            // src={item.product.image} 
-                            // alt={item.product.name} 
-                            className="w-16 h-16 object-cover rounded mx-auto"
-                          />
+                          {item.imageUrl ? (
+                            <img
+                              src={item.imageUrl.match(/^https?:\/\//) ? item.imageUrl : `${API_BASE}/api/Product/image/${item.imageUrl}`}
+                              alt={item.productName}
+                              className="w-16 h-16 object-cover rounded mx-auto"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div className="w-16 h-16 bg-gray-200 rounded mx-auto flex items-center justify-center text-gray-500 text-xs">
+                              No Image
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4 text-center">{item.price.toLocaleString()} đ</td>
                         <td className="py-3 px-4 text-center">{item.quantity}</td>
