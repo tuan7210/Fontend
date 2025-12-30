@@ -4,7 +4,12 @@ import { productService } from '../../services/productService';
 import { stockManager } from '../../utils/stockManager';
 import Button from '../../components/UI/Button';
 
-import { Product } from '../../types';
+import { Product as BaseProduct } from '../../types';
+
+// Extend Product type to include optional paymentStatus
+type Product = BaseProduct & {
+  paymentStatus?: 'paid' | 'unpaid';
+};
 
 // Định nghĩa interface cho Category từ API
 interface Category {
@@ -792,6 +797,12 @@ const AdminProducts: React.FC = () => {
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
+                      {/* Hiển thị trạng thái thanh toán nếu có */}
+                      {product.paymentStatus && (
+                        <div className={`mt-2 text-xs font-semibold ${product.paymentStatus === 'paid' ? 'text-green-600' : 'text-red-600'}`}>
+                          {product.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))

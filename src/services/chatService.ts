@@ -50,7 +50,18 @@ export interface ChatResponseData {
 // --- Hết phần interfaces cũ ---
 
 
-const BASE_URL = 'http://localhost:8000'; // URL backend mới
+const BASE_URL = 'http://localhost:8000'; // Python search/chat service
+const IMAGE_BASE = (import.meta as any).env?.VITE_IMAGE_BASE || 'http://localhost:5032'; // ASP.NET API for static images
+
+function resolveImageUrl(url?: string | null): string | null {
+  if (!url) return null;
+  // Nếu là URL tuyệt đối thì giữ nguyên
+  if (/^https?:\/\//i.test(url)) return url;
+  // Nếu bắt đầu bằng '/' (ví dụ '/images/...') thì nối với IMAGE_BASE
+  if (url.startsWith('/')) return `${IMAGE_BASE}${url}`;
+  // Nếu chỉ là tên file (ví dụ 'abc.jpg') thì mặc định nằm trong '/images'
+  return `${IMAGE_BASE}/images/${url}`;
+}
 
 /**
  * Gửi câu hỏi đến API chat mới và chuyển đổi response về định dạng cũ
@@ -77,7 +88,7 @@ export async function askChat(req: NewChatRequest): Promise<ChatResponseData> {
     brand: p.brand,
     category: p.category_name,
     price: p.price,
-    imageUrl: p.image_url,
+    imageUrl: resolveImageUrl(p.image_url),
     usp: p.usp,
     specificationsText: p.spec_text,
     // Các trường cũ không có trong API mới sẽ để là null/undefined

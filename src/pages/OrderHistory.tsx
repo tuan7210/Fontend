@@ -325,6 +325,9 @@ const OrderHistory: React.FC = () => {
                         {selectedOrder.status === 'delivered' && 'Đã giao'}
                         {selectedOrder.status === 'cancelled' && 'Đã hủy'}
                       </span>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium border ${selectedOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'}`}>
+                        {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                      </span>
                     </div>
                   </div>
                   <div className="flex flex-col">
@@ -385,6 +388,12 @@ const OrderHistory: React.FC = () => {
                     <div>
                       <p className="text-sm text-gray-500 mb-1">Địa chỉ giao hàng</p>
                       <p className="font-medium">{selectedOrder.shippingAddress}</p>
+                      <p className="text-sm text-gray-600 mt-2">
+                        <span className="font-medium">Trạng thái thanh toán: </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${selectedOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'}`}>
+                          {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                        </span>
+                      </p>
                     </div>
                   </div>
                 </div>

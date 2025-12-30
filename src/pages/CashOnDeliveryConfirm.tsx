@@ -75,19 +75,19 @@ const CashOnDeliveryConfirm: React.FC = () => {
         return;
       }
       if (paymentMethod === 'online') {
-        // Tạo đơn hàng online tại đây, sau đó chuyển sang trang checkout-online để hiển thị QR và thông tin
-        const orderRequest: CreateOrderRequest = {
-          items: orderItems.map(item => ({
-            productId: parseInt(item.product.id),
-            quantity: item.quantity
-          })),
-          // Backend mẫu chỉ cần địa chỉ thuần: "Số 1 Nguyễn Trãi, Quận 1, TP.HCM"
-          // Người dùng phải nhập đầy đủ địa chỉ vào ô address.
-          shippingAddress: cleanAddress,
-          paymentMethod: 'online'
-        };
-        const response = await orderService.createOrder(orderRequest);
-        navigate(`/checkout-online?orderId=${response.orderId}`);
+        // Online: chỉ tiếp tục để tạo link PayOS, KHÔNG tạo đơn hàng ở đây
+        const total = Math.round(getTotalPrice() * 1.08);
+        navigate('/checkout-online', {
+          state: {
+            items: orderItems.map(item => ({
+              id: item.id,
+              product: item.product,
+              quantity: item.quantity
+            })),
+            address: cleanAddress,
+            total
+          }
+        });
         return;
       }
       // Nếu là COD thì giữ nguyên logic đặt hàng
@@ -207,7 +207,7 @@ const CashOnDeliveryConfirm: React.FC = () => {
                 Đang xử lý...
               </span>
             ) : (
-              "Xác nhận đặt hàng"
+              (paymentMethod === 'online' ? 'Tiếp tục thanh toán' : 'Xác nhận đặt hàng')
             )}
           </Button>
         </form>

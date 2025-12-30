@@ -71,6 +71,7 @@ const OrderDetail: React.FC = () => {
               zipCode: '',
             },
             paymentMethod: orderData.paymentMethod,
+            paymentStatus: orderData.paymentStatus,
             createdAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
             updatedAt: orderData.orderDate ? new Date(orderData.orderDate).toISOString() : new Date().toISOString(),
           };
@@ -174,6 +175,12 @@ const OrderDetail: React.FC = () => {
                         : order.paymentMethod
                           ? order.paymentMethod
                           : 'Không xác định'}
+                  </p>
+                  <p className="text-gray-600 mt-1">
+                    <span className="font-medium">Trạng thái thanh toán: </span>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'}`}>
+                      {order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                    </span>
                   </p>
                 </div>
               </div>

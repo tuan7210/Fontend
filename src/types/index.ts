@@ -67,6 +67,7 @@ export interface Order {
     zipCode: string;
   };
   paymentMethod?: string; // Thêm trường phương thức thanh toán
+  paymentStatus?: string; // 'paid' | 'unpaid'
   createdAt: string;
   updatedAt: string;
 }

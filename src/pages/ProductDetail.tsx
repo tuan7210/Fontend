@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Star, ShoppingCart } from 'lucide-react';
+import RatingStars from '../components/UI/RatingStars';
 import { Product } from '../types';
 import { productService } from '../services/productService';
 import { stockManager } from '../utils/stockManager';
@@ -173,11 +174,7 @@ const ProductDetail: React.FC = () => {
               </div>
               {/* Đánh giá trung bình và số lượng đánh giá từ backend */}
               <div className="flex items-center gap-3 mb-6">
-                <span className="flex items-center gap-1">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className={`w-6 h-6 ${i < Math.round(averageRating) ? 'text-yellow-400' : 'text-gray-300'}`} />
-                  ))}
-                </span>
+                <RatingStars rating={averageRating} size="lg" />
                 <span className="text-lg text-gray-700 font-semibold">{averageRating.toFixed(1)} / 5</span>
                 <span className="text-base text-gray-500">({reviewCount} đánh giá)</span>
               </div>
@@ -326,9 +323,7 @@ const ProductDetail: React.FC = () => {
                             <h4 className="font-semibold text-gray-800">{review.userName}</h4>
                             <div className="flex items-center">
                               <div className="flex">
-                                {[...Array(5)].map((_, i) => (
-                                  <Star key={i} className={`w-4 h-4 ${i < review.rating ? 'text-yellow-400' : 'text-gray-300'}`} />
-                                ))}
+                                <RatingStars rating={review.rating} size="sm" />
                               </div>
                               <span className="ml-2 text-sm text-gray-500">
                                 {new Date(review.createdAt).toLocaleDateString('vi-VN')}

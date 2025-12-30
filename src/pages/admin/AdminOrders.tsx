@@ -92,22 +92,6 @@ const AdminOrders: React.FC = () => {
     setSelectedOrder(orderDetail as OrderResponse);
   }
 
-  // Xác nhận đã thanh toán
-  const handleConfirmPayment = async (orderId: number) => {
-    setUpdatingOrder(orderId);
-    try {
-      await orderService.confirmPayment(orderId);
-      // Sau khi xác nhận, reload lại chi tiết đơn hàng
-      const updatedOrder = await orderService.getOrderById(orderId);
-      setSelectedOrder(updatedOrder as OrderResponse);
-      fetchOrders();
-    } catch (error) {
-      alert('Xác nhận thanh toán thất bại!');
-    } finally {
-      setUpdatingOrder(null);
-    }
-  };
-
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between mb-8">
@@ -200,6 +184,14 @@ const AdminOrders: React.FC = () => {
                       <span className={`px-2 py-1 rounded text-xs font-medium ${getStatusColor(order.status)}`}>
                         {getStatusName(order.status)}
                       </span>
+                      {order.paymentStatus && (
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-semibold border ${order.paymentStatus === 'paid' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}
+                          title="Trạng thái thanh toán"
+                        >
+                          {order.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="py-3 px-4 text-gray-500">{new Date(order.orderDate).toLocaleDateString()}</td>
@@ -257,6 +249,12 @@ const AdminOrders: React.FC = () => {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Phương thức thanh toán:</span>
                     <span className="font-semibold capitalize">{selectedOrder.paymentMethod === 'online' ? 'Thanh toán online' : selectedOrder.paymentMethod === 'cash_on_delivery' ? 'Thanh toán khi nhận hàng' : selectedOrder.paymentMethod}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Trạng thái thanh toán:</span>
+                    <span className={`px-2 py-1 rounded text-xs font-semibold border ${selectedOrder.paymentStatus === 'paid' ? 'bg-green-100 text-green-700 border-green-300' : 'bg-red-100 text-red-700 border-red-300'}`}>
+                      {selectedOrder.paymentStatus === 'paid' ? 'Đã thanh toán' : 'Chưa thanh toán'}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -336,17 +334,6 @@ const AdminOrders: React.FC = () => {
             <div className="border-t pt-4 mt-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-3">Cập nhật trạng thái đơn hàng</h3>
               <div className="flex flex-wrap gap-2">
-                {/* Nút xác nhận đã thanh toán */}
-                {selectedOrder.paymentStatus !== 'paid' && (
-                  <Button
-                    onClick={() => handleConfirmPayment(selectedOrder.orderId)}
-                    className="bg-indigo-500 hover:bg-indigo-600 flex items-center gap-1"
-                    disabled={updatingOrder === selectedOrder.orderId}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    Xác nhận đã thanh toán
-                  </Button>
-                )}
                 {selectedOrder.status !== 'pending' && (
                   <Button
                     onClick={() => handleUpdateStatus(selectedOrder.orderId, 'pending')}

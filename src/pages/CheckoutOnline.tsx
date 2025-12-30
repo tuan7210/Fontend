@@ -20,17 +20,17 @@ const CheckoutOnline: React.FC = () => {
   // Lấy orderId từ params hoặc state
   const searchParams = new URLSearchParams(location.search);
   const orderIdFromQuery = searchParams.get('orderId');
-  const [orderId] = useState<number | null>(state.orderId || (orderIdFromQuery ? Number(orderIdFromQuery) : null));
+    const [orderId] = useState<number | null>(state.orderId || (orderIdFromQuery ? Number(orderIdFromQuery) : null));
 
   // State thông tin người dùng
-  const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
-  const [address, setAddress] = useState('');
+    const [name, setName] = useState('');
+    const [phone, setPhone] = useState('');
+    const [address, setAddress] = useState(state.address || '');
   const { user } = useAuth();
   
   // State đơn hàng
-  const [items, setItems] = useState<any[]>([]);
-  const [total, setTotal] = useState<number>(0);
+    const [items, setItems] = useState<any[]>(state.items || []);
+    const [total, setTotal] = useState<number>(state.total || 0);
   const [status, setStatus] = useState<string>('PENDING'); // Trạng thái đơn hàng
   
   // State xử lý
@@ -46,69 +46,92 @@ const CheckoutOnline: React.FC = () => {
   const hasCreatedLink = useRef(false);
 
   // 1. Lấy thông tin đơn hàng & User
-  useEffect(() => {
-    const fetchOrderData = async () => {
-      if (!orderId) {
-        setError('Không tìm thấy mã đơn hàng.');
-        return;
-      }
-      setIsProcessing(true);
-      try {
-        // Gọi API lấy chi tiết đơn hàng
-        const order = await orderService.getOrderById(orderId);
-        setItems(order.items || []);
-        setTotal(order.totalAmount || 0);
-        setStatus(order.status || 'PENDING');
-
-        // Nếu đơn hàng đã PAID rồi thì set luôn
-        if (order.status === 'PAID' || order.status === 'COMPLETED') {
-            setIsPaid(true);
-        }
-
-        // Parse địa chỉ giao hàng
-        if (order.shippingAddress) {
-          const parts = order.shippingAddress.split(',').map((s: string) => s.trim());
-          setName(parts[0] || '');
-          setPhone(parts[1] || '');
-          setAddress(parts[2] || '');
-        }
-      } catch (err) {
-        setError('Không thể lấy thông tin đơn hàng.');
-      } finally {
-        setIsProcessing(false);
-      }
-    };
-
-    fetchOrderData();
-  }, [orderId]);
-
-  // 2. Tạo Link Thanh Toán PayOS (Chỉ chạy 1 lần khi có total > 0)
-  useEffect(() => {
-    const createLink = async () => {
-        if (orderId && total > 0 && !checkoutUrl && !isPaid && !hasCreatedLink.current) {
-            hasCreatedLink.current = true; // Đánh dấu đã gọi
+    useEffect(() => {
+        const fetchOrderData = async () => {
+            // Không có orderId: dùng dữ liệu từ state (flow online tiếp tục)
+            if (!orderId) {
+                if (state && state.items && state.total) {
+                    setItems(state.items);
+                    setTotal(state.total);
+                    setStatus('PENDING');
+                    setIsProcessing(false);
+                    return;
+                } else {
+                    setError('Không có dữ liệu đơn hàng. Vui lòng quay lại và thử lại.');
+                    setIsProcessing(false);
+                    return;
+                }
+            }
+            setIsProcessing(true);
             try {
-                console.log("Đang tạo link thanh toán PayOS...");
-                
-                const res = await axios.post(`${BACKEND_URL}/api/payos/create-payment-link`, {
-                    productName: `Don hang #${orderId}`,
-                    description: `Thanh toan don #${orderId}`,
-                    price: total,
-                    returnUrl: window.location.href, // Quay lại trang hiện tại sau khi thanh toán
-                    cancelUrl: window.location.href
-                });
+                // Có orderId: lấy chi tiết đơn hàng
+                const order = await orderService.getOrderById(orderId);
+                setItems(order.items || []);
+                setTotal(order.totalAmount || 0);
+                setStatus(order.status || 'PENDING');
 
-                if (res.data && res.data.checkoutUrl) {
-                    setCheckoutUrl(res.data.checkoutUrl);
+                if (order.status === 'PAID' || order.status === 'COMPLETED') {
+                        setIsPaid(true);
+                }
+
+                if (order.shippingAddress) {
+                    const parts = order.shippingAddress.split(',').map((s: string) => s.trim());
+                    setName(parts[0] || '');
+                    setPhone(parts[1] || '');
+                    setAddress(parts[2] || '');
                 }
             } catch (err) {
-                console.error("Lỗi tạo link PayOS:", err);
-                // Không set Error chặn màn hình, để user có thể reload thử lại
+                setError('Không thể lấy thông tin đơn hàng.');
+            } finally {
+                setIsProcessing(false);
             }
-        }
-    };
-    createLink();
-  }, [orderId, total, isPaid, checkoutUrl]);
+        };
+        fetchOrderData();
+    }, [orderId, state]);
+
+  // 2. Tạo Link Thanh Toán PayOS (Chỉ chạy 1 lần khi có total > 0)
+    useEffect(() => {
+        const createLink = async () => {
+            // Mode có orderId: tạo link theo đơn hàng
+            if (orderId && total > 0 && !checkoutUrl && !isPaid && !hasCreatedLink.current) {
+                hasCreatedLink.current = true;
+                try {
+                    const res = await axios.post(`${BACKEND_URL}/api/payos/create-payment-link`, {
+                        productName: `Don hang #${orderId}`,
+                        description: `Thanh toan don #${orderId}`,
+                        price: total,
+                        returnUrl: window.location.href,
+                        cancelUrl: window.location.href
+                    });
+                    if (res.data && res.data.checkoutUrl) {
+                        setCheckoutUrl(res.data.checkoutUrl);
+                    }
+                } catch (err) {
+                    console.error('Lỗi tạo link PayOS:', err);
+                }
+                return;
+            }
+            // Mode không có orderId: tạo link dựa trên giỏ hàng/state
+            if (!orderId && total > 0 && !checkoutUrl && !isPaid && !hasCreatedLink.current) {
+                hasCreatedLink.current = true;
+                try {
+                    const res = await axios.post(`${BACKEND_URL}/api/payos/create-payment-link`, {
+                        productName: 'Thanh toan don hang',
+                        description: 'Thanh toan don hang',
+                        price: total,
+                        returnUrl: window.location.href,
+                        cancelUrl: window.location.href
+                    });
+                    if (res.data && res.data.checkoutUrl) {
+                        setCheckoutUrl(res.data.checkoutUrl);
+                    }
+                } catch (err) {
+                    console.error('Lỗi tạo link PayOS:', err);
+                }
+            }
+        };
+        createLink();
+    }, [orderId, total, isPaid, checkoutUrl]);
 
   // 3. Polling: Tự động check trạng thái mỗi 3 giây
   useEffect(() => {
@@ -232,7 +255,7 @@ const CheckoutOnline: React.FC = () => {
         {/* CỘT PHẢI: THÔNG TIN ĐƠN HÀNG */}
         <div className="md:w-1/2 p-8 bg-white">
             <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-gray-700">Đơn hàng #{orderId}</h3>
+                <h3 className="text-lg font-bold text-gray-700">{orderId ? `Đơn hàng #${orderId}` : 'Thanh toán online'}</h3>
                 <span className="px-3 py-1 bg-yellow-100 text-yellow-700 text-xs font-bold rounded-full uppercase tracking-wide">
                     {status}
                 </span>
@@ -246,7 +269,7 @@ const CheckoutOnline: React.FC = () => {
                             <div className="text-gray-400 text-xs">Số lượng: {item.quantity}</div>
                         </div>
                         <div className="font-semibold text-gray-700">
-                            {(item.price * item.quantity).toLocaleString()} đ
+                            {(((item && item.price) ?? (item?.product?.price) ?? 0) * item.quantity).toLocaleString()} đ
                         </div>
                     </div>
                 )) : <p className="text-gray-400 text-sm">Không có sản phẩm</p>}

@@ -24,7 +24,7 @@ const ChatBox: React.FC = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
-  const [topK, setTopK] = useState(5);
+  const [topK] = useState(3);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -99,6 +99,15 @@ const ChatBox: React.FC = () => {
     return price.toLocaleString('vi-VN') + ' đ';
   };
 
+  const getImageSrc = (u?: string | null) => {
+    if (!u) return '';
+    // If absolute and not pointing to /images, keep as is
+    if (/^https?:\/\//.test(u) && !u.includes('/images/')) return u;
+    // Else extract filename and use API route
+    const fileName = u.split('/').pop() || u;
+    return `http://localhost:5032/api/Product/image/${fileName}`;
+  };
+
   const renderProducts = (products: ChatProduct[]) => {
     if (!products || products.length === 0) return null;
 
@@ -118,7 +127,7 @@ const ChatBox: React.FC = () => {
               <div className="flex gap-3">
                 {product.imageUrl && (
                   <img
-                    src={product.imageUrl} // API mới đã trả về URL đầy đủ
+                    src={getImageSrc(product.imageUrl)}
                     alt={product.name}
                     className="w-20 h-20 object-cover rounded-md flex-shrink-0"
                   />
@@ -183,17 +192,7 @@ const ChatBox: React.FC = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* TopK Selector */}
-              <select
-                value={topK}
-                onChange={(e) => setTopK(Number(e.target.value))}
-                className="bg-white/20 text-white text-xs px-2 py-1 rounded border border-white/30 focus:outline-none focus:ring-2 focus:ring-white/50"
-                title="Số sản phẩm gợi ý"
-              >
-                {[3, 5, 7, 10].map(k => (
-                  <option key={k} value={k} className="bg-blue-600">Top {k}</option>
-                ))}
-              </select>
+              <div className="text-white text-xs px-2 py-1 rounded border border-white/30" title="Số sản phẩm gợi ý">Top 3</div>
               <button
                 onClick={() => setIsOpen(false)}
                 className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
