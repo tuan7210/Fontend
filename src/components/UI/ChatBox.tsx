@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Send, Bot, User, Sparkles, TrendingUp, Loader2 } from 'lucide-react';
+import { X, Send, Bot, User, Sparkles, TrendingUp, Loader2, RotateCcw } from 'lucide-react';
 import { chatService, ChatProduct, ChatMode } from '../../services/chatService';
 import { Link } from 'react-router-dom';
 
@@ -13,20 +13,25 @@ interface Message {
 }
 
 const ChatBox: React.FC = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([
+  const initialMessages = (): Message[] => ([
     {
       id: '1',
-      type: 'ai',
-      text: 'Xin chào! 👋 Tôi là trợ lý AI của TechStore. Tôi có thể giúp bạn tìm sản phẩm công nghệ phù hợp với nhu cầu. Hãy mô tả cho tôi biết bạn đang tìm gì nhé!',
+      type: 'ai' as const,
+      text: 'Xin chào! 👋 Tôi là trợ lý AI của TechStore. Tôi có thể giúp bạn tìm sản phẩm phù hợp.',
       timestamp: new Date()
     }
   ]);
+
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>(initialMessages());
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [topK] = useState(3);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // ✅ SESSION ID – QUAN TRỌNG
+  const sessionId = useRef<string>(crypto.randomUUID());
 
   // Scroll to bottom when messages change
   const scrollToBottom = () => {
@@ -61,28 +66,31 @@ const ChatBox: React.FC = () => {
     try {
       const data = await chatService.askChat({
         query: userMessage.text,
+        session_id: sessionId.current, // ✅ GỬI SESSION
         top_k: topK
       });
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         type: 'ai',
-        text: data.answer || 'Xin lỗi, tôi không thể tìm thấy câu trả lời phù hợp.',
+        text: data.answer,
         products: data.products,
         mode: data.mode,
         timestamp: new Date()
       };
 
       setMessages(prev => [...prev, aiMessage]);
-    } catch (error: any) {
-      const errorMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        type: 'ai',
-        text: 'Xin lỗi, đã có lỗi xảy ra. Vui lòng thử lại sau. 😔',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, errorMessage]);
-      console.error('Chat error:', error);
+    } catch (error) {
+      setMessages(prev => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          type: 'ai',
+          text: 'Xin lỗi, đã có lỗi xảy ra 😔',
+          timestamp: new Date()
+        }
+      ]);
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -97,6 +105,12 @@ const ChatBox: React.FC = () => {
 
   const formatPrice = (price: number) => {
     return price.toLocaleString('vi-VN') + ' đ';
+  };
+
+  const handleReset = () => {
+    sessionId.current = crypto.randomUUID();
+    setMessages(initialMessages());
+    setInputValue('');
   };
 
   const getImageSrc = (u?: string | null) => {
@@ -142,7 +156,6 @@ const ChatBox: React.FC = () => {
                   <div className="text-blue-600 font-bold text-sm mb-2">
                     {formatPrice(product.price)}
                   </div>
-                  {/* Sử dụng usp và specificationsText từ dữ liệu đã map */}
                   {(product.usp || product.specificationsText) && (
                     <p className="text-xs text-gray-600 line-clamp-2">
                       {(product.usp || product.specificationsText || '').toString().slice(0, 150)}
@@ -284,6 +297,14 @@ const ChatBox: React.FC = () => {
                 disabled={loading}
               />
               <button
+                onClick={handleReset}
+                disabled={loading}
+                className="w-12 h-12 rounded-xl border-2 border-gray-200 text-gray-600 flex items-center justify-center hover:bg-gray-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                aria-label="Reset chat"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+              <button
                 onClick={handleSend}
                 disabled={loading || !inputValue.trim()}
                 className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-600 to-purple-600 text-white flex items-center justify-center hover:shadow-lg hover:scale-105 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -302,6 +323,7 @@ const ChatBox: React.FC = () => {
           </div>
         </div>
       )}
+      <div ref={messagesEndRef} />
     </>
   );
 };

@@ -17,11 +17,20 @@ const Header: React.FC = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchQuery.trim()) {
-      // Điều hướng đến trang Home với tham số tìm kiếm thay vì trang Search
-      navigate(`/?search=${encodeURIComponent(searchQuery)}`);
-      // Khi đến trang Home, chức năng tìm kiếm sẽ được kích hoạt
-    }
+    if (!searchQuery.trim()) return;
+
+    // Điều hướng đến trang Home với tham số tìm kiếm
+    navigate(`/?search=${encodeURIComponent(searchQuery)}`);
+
+    // Sau điều hướng, cuộn đến khu vực kết quả
+    setTimeout(() => {
+      const resultsSection = document.getElementById('featured-products');
+      if (resultsSection) {
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    }, 0);
   };
 
   const categories = [
@@ -106,9 +115,16 @@ const Header: React.FC = () => {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Bạn muốn mua gì hôm nay ?"
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-20 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md text-sm"
+                aria-label="Tìm kiếm"
+              >
+                Tìm
+              </button>
             </div>
           </form>
 
@@ -154,7 +170,14 @@ const Header: React.FC = () => {
                     <button
                       onClick={() => {
                         logout();
-                        navigate('/'); // Chuyển hướng về trang Home sau khi đăng xuất
+                        if (location.pathname === '/') {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        } else {
+                          navigate('/');
+                          setTimeout(() => {
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }, 0);
+                        }
                       }}
                       className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-gray-50 hover:text-red-600 transition-colors font-semibold"
                     >
@@ -190,9 +213,16 @@ const Header: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search products..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-20 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <button
+              type="submit"
+              className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-md text-sm"
+              aria-label="Tìm kiếm"
+            >
+              Tìm
+            </button>
           </form>
         </div>
       </div>

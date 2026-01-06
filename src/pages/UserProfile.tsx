@@ -44,6 +44,7 @@ const UserProfile: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // Đồng bộ form với profile mỗi khi profile thay đổi
   useEffect(() => {
@@ -123,8 +124,9 @@ const UserProfile: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!profile) return;
+    if (!profile || !editing) return; // Chỉ lưu khi đang ở chế độ chỉnh sửa
     setError(null);
+    setSuccess(null);
     try {
       const updatedRes = await updateCurrentCustomer({
         name: form.name.trim(),
@@ -186,6 +188,7 @@ const UserProfile: React.FC = () => {
         // Silent fail - we still updated the profile successfully
       }
       setEditing(false);
+      setSuccess('Thông tin đã được cập nhật');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
     }
@@ -301,6 +304,11 @@ const UserProfile: React.FC = () => {
             )}
           </div>
         )}
+        {success && (
+          <div className="mb-4 rounded-md bg-green-50 border border-green-200 text-green-700 px-4 py-3 text-sm">
+            <div className="font-medium">{success}</div>
+          </div>
+        )}
         <div className="flex flex-col items-center mb-6">
           <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center text-3xl font-bold text-blue-600 mb-2">
             {profile.name && profile.name.length > 0
@@ -352,7 +360,11 @@ const UserProfile: React.FC = () => {
           </div>
           <div className="flex justify-center gap-4 mt-6">
             {!editing ? (
-              <Button type="button" className="bg-blue-600 text-white px-6" onClick={() => setEditing(true)}>
+              <Button
+                type="button"
+                className="bg-blue-600 text-white px-6"
+                onClick={(e) => { e.preventDefault(); setEditing(true); }}
+              >
                 Chỉnh sửa
               </Button>
             ) : (

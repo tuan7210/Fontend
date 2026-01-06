@@ -40,9 +40,8 @@ const StockNotification: React.FC = () => {
     setNotifications(prev => prev.filter(n => n.timestamp !== timestamp));
   };
 
-  if (notifications.length === 0) {
-    return null;
-  }
+  // Ẩn hoàn toàn thông báo tồn kho
+  return null;
 
   return (
     <div className="fixed top-4 right-4 z-50 space-y-2">

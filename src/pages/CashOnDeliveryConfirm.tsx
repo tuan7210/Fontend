@@ -67,54 +67,46 @@ const CashOnDeliveryConfirm: React.FC = () => {
         setTimeout(() => navigate('/login'), 2000);
         return;
       }
-  // Lấy sản phẩm trực tiếp từ context (đã đồng bộ với backend)
-  const orderItems = items;
+      const orderItems = items;
       if (orderItems.length === 0) {
         setError("Không có sản phẩm nào trong đơn hàng");
         setIsProcessing(false);
         return;
       }
-      if (paymentMethod === 'online') {
-        // Online: chỉ tiếp tục để tạo link PayOS, KHÔNG tạo đơn hàng ở đây
-        const total = Math.round(getTotalPrice() * 1.08);
-        navigate('/checkout-online', {
-          state: {
-            items: orderItems.map(item => ({
-              id: item.id,
-              product: item.product,
-              quantity: item.quantity
-            })),
-            address: cleanAddress,
-            total
-          }
-        });
-        return;
-      }
-      // Nếu là COD thì giữ nguyên logic đặt hàng
+      // Luôn tạo đơn hàng trước cho cả COD và ONLINE
       const orderRequest: CreateOrderRequest = {
         items: orderItems.map(item => ({
           productId: parseInt(item.product.id),
           quantity: item.quantity
         })),
-        // Gửi đúng format backend yêu cầu: chỉ địa chỉ
         shippingAddress: cleanAddress,
-        paymentMethod: 'cash_on_delivery'
+        paymentMethod: paymentMethod === 'online' ? 'online' : 'cash_on_delivery'
       };
       const response = await orderService.createOrder(orderRequest);
-      // Đơn hàng tạo thành công nếu không có lỗi
       await handleOrderSuccess();
       setConfirmed(true);
       setTimeout(() => {
-        navigate('/cash-on-delivery-info', {
-          state: {
-            name,
-            phone,
-            address,
-            items: orderItems,
-            total: response.totalAmount || getTotalPrice() * 1.08,
-            orderId: response.orderId
-          }
-        });
+        if (paymentMethod === 'online') {
+          navigate('/checkout-online', {
+            state: {
+              orderId: response.orderId,
+              items: orderItems,
+              address: cleanAddress,
+              total: response.totalAmount || getTotalPrice() * 1.08
+            }
+          });
+        } else {
+          navigate('/cash-on-delivery-info', {
+            state: {
+              name,
+              phone,
+              address,
+              items: orderItems,
+              total: response.totalAmount || getTotalPrice() * 1.08,
+              orderId: response.orderId
+            }
+          });
+        }
       }, 1800);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Đã có lỗi xảy ra khi đặt hàng");

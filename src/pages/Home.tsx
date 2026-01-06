@@ -35,9 +35,10 @@ const Home: React.FC = () => {
   const searchResultsRef = useRef<HTMLDivElement>(null);
   const { subscribe } = useReload();
   
-  // Cập nhật isSearchActive khi categoryFromURL thay đổi
+  // Cập nhật trạng thái từ URL: kích hoạt tìm kiếm và đồng bộ ô input
   useEffect(() => {
     setIsSearchActive(!!searchFromURL || !!categoryFromURL);
+    setSearchInput(searchFromURL);
   }, [categoryFromURL, searchFromURL]);
 
   // Tải và hiển thị sản phẩm

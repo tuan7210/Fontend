@@ -218,51 +218,59 @@ export async function updateCustomer(id: number | string, input: UpdateCustomerI
 
 export async function updateCurrentCustomer(input: UpdateCustomerInput): Promise<Customer> {
   try {
-    // Lấy userId từ localStorage - cần phải có userId để update
     const userData = localStorage.getItem('user');
-    let userId = null;
-    
+    let currentRole: 'customer' | 'admin' = 'customer';
     if (userData) {
       try {
-        const user = JSON.parse(userData);
-        userId = user.userId;
-      } catch (e) {
-      }
+        const parsed = JSON.parse(userData);
+        if (parsed?.role) currentRole = parsed.role;
+      } catch {}
     }
-    
-    if (!userId) {
-      throw new Error('Không tìm thấy thông tin người dùng hiện tại');
-    }
-    
-    // Sử dụng userId để cập nhật thông tin user
-    const resp = await http<ApiCustomer>(`/api/Customer/${userId}`, {
+
+    // Gọi API mới: PUT /api/auth/me
+    const resp = await http<any>(`/api/auth/me`, {
       method: 'PUT',
       body: JSON.stringify({
         name: input.name,
-        email: input.email,
         phone: input.phone,
         address: input.address
       }),
     });
-    
-    if (!resp.success) throw new Error(resp.message || 'Cập nhật thất bại');
-    if (!resp.data) throw new Error(resp.message || 'Cập nhật thất bại');
-    
-    // Cập nhật thông tin user trong localStorage
+
+    // Hỗ trợ nhiều định dạng trả về: { user: {...} } hoặc trả trực tiếp
+    const payload: any = resp as any;
+    const dataObj: any = (payload && typeof payload === 'object' && 'data' in payload) ? payload.data : payload;
+    const u = (dataObj && typeof dataObj === 'object' && 'user' in dataObj) ? dataObj.user : dataObj;
+
+    const mapped: Customer = {
+      userId: u?.userId ?? u?.UserId ?? 0,
+      name: u?.name ?? u?.Name ?? '',
+      email: u?.email ?? u?.Email ?? '',
+      role: currentRole,
+      phone: u?.phone ?? u?.Phone ?? '',
+      address: u?.address ?? u?.Address ?? '',
+      status: 'active',
+      orderCount: 0,
+      totalSpent: 0,
+      recentOrders: [],
+    };
+
+    // Cập nhật thông tin user tối thiểu trong localStorage
     try {
       if (userData) {
-        const user = JSON.parse(userData);
+        const prev = JSON.parse(userData);
         const updatedUser = {
-          ...user,
-          name: input.name || user.name,
-          email: input.email || user.email
+          ...prev,
+          name: mapped.name || prev.name,
+          email: mapped.email || prev.email,
+          phone: mapped.phone ?? prev.phone,
+          address: mapped.address ?? prev.address,
         };
         localStorage.setItem('user', JSON.stringify(updatedUser));
       }
-    } catch (e) {
-    }
-    
-    return mapApiCustomer(resp.data as ApiCustomer);
+    } catch {}
+
+    return mapped;
   } catch (error) {
     throw error;
   }

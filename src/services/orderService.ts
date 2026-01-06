@@ -297,9 +297,7 @@ export const orderService = {
     try {
       // Chỉ cho phép tạo đơn trực tiếp với COD
       const pm = (orderData.paymentMethod || '').toLowerCase();
-      if (pm && pm !== 'cash_on_delivery' && pm !== 'cod' && pm !== 'thanh toán khi nhận hàng' && pm !== 'thanh toan khi nhan hang') {
-        throw new Error('Đơn online không tạo trực tiếp. Vui lòng tiếp tục để tạo link thanh toán.');
-      }
+     
       // Tạo payload không có userId (backend sẽ tự lấy từ JWT token)
       const payload = {
         shippingAddress: orderData.shippingAddress,

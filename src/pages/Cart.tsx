@@ -157,13 +157,12 @@ const Cart: React.FC = () => {
                   <span>Miễn phí</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Thuế:</span>
-                  <span>{Math.round(getTotalPrice() * 0.08).toLocaleString()} đ</span>
+                  
                 </div>
                 <div className="border-t pt-3">
                   <div className="flex justify-between font-semibold text-lg">
                     <span>Tổng cộng:</span>
-                    <span>{Math.round(getTotalPrice() * 1.08).toLocaleString()} đ</span>
+                    <span>{getTotalPrice().toLocaleString()} đ</span>
                   </div>
                 </div>
               </div>

@@ -66,6 +66,10 @@ const OrderHistory: React.FC = () => {
   const { user } = useAuth();
   const [orders, setOrders] = useState<OrderResponse[]>([]);
   const [loading, setLoading] = useState(true);
+  // Phân trang
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(5); // Số đơn mỗi trang
+  const [totalPages, setTotalPages] = useState(1);
   // State cho form đánh giá
   const [showReview, setShowReview] = useState<{orderId: number, productId: number, orderItemId: number} | null>(null);
   const [reviewText, setReviewText] = useState('');
@@ -79,8 +83,8 @@ const OrderHistory: React.FC = () => {
     const fetchOrders = async () => {
       setLoading(true);
       try {
-        // Gọi API lấy đơn hàng của user (đã đăng nhập)
-        const res = await fetch('http://localhost:5032/api/Order/my', {
+        // Gọi API lấy đơn hàng của user (đã đăng nhập), hỗ trợ phân trang
+        const res = await fetch(`http://localhost:5032/api/Order/my?page=${page}&pageSize=${pageSize}`, {
           headers: {
             'Authorization': `Bearer ${localStorage.getItem('token') || ''}`
           }
@@ -88,17 +92,20 @@ const OrderHistory: React.FC = () => {
         const result = await res.json();
         if (result.success && Array.isArray(result.data)) {
           setOrders(result.data);
+          setTotalPages((result.pagination && result.pagination.totalPages) || 1);
         } else {
           setOrders([]);
+          setTotalPages(1);
         }
       } catch (error) {
         setOrders([]);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
     };
     fetchOrders();
-  }, [user]);
+  }, [user, page, pageSize]);
 
   // Đánh giá nhiều lần: luôn trả về false để luôn hiển thị nút đánh giá
   // const hasReviewed = (productId: string) => false; // Không dùng nữa
@@ -289,6 +296,24 @@ const OrderHistory: React.FC = () => {
             ))}
           </div>
         )}
+        {/* PHÂN TRANG */}
+        <div className="flex justify-center mt-8 gap-2">
+          <button
+            className={`px-3 py-1 rounded ${page === 1 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+          >
+            Trang trước
+          </button>
+          <span className="px-3 py-1 font-semibold">{page} / {totalPages}</span>
+          <button
+            className={`px-3 py-1 rounded ${page === totalPages ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+          >
+            Trang sau
+          </button>
+        </div>
         
         {/* Modal chi tiết đơn hàng */}
         {selectedOrder && (

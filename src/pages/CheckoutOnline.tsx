@@ -38,7 +38,7 @@ const CheckoutOnline: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { handleOrderSuccess } = useCart();
 
-  // State PayOS
+    // State thanh toán online
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [isPaid, setIsPaid] = useState(false); 
   
@@ -97,17 +97,15 @@ const CheckoutOnline: React.FC = () => {
                 hasCreatedLink.current = true;
                 try {
                     const res = await axios.post(`${BACKEND_URL}/api/payos/create-payment-link`, {
-                        productName: `Don hang #${orderId}`,
-                        description: `Thanh toan don #${orderId}`,
+                        orderId: orderId,
                         price: total,
-                        returnUrl: window.location.href,
-                        cancelUrl: window.location.href
+                        // Các trường khác nếu backend cần
                     });
                     if (res.data && res.data.checkoutUrl) {
                         setCheckoutUrl(res.data.checkoutUrl);
                     }
                 } catch (err) {
-                    console.error('Lỗi tạo link PayOS:', err);
+                    console.error('Lỗi tạo link online:', err);
                 }
                 return;
             }
@@ -126,7 +124,7 @@ const CheckoutOnline: React.FC = () => {
                         setCheckoutUrl(res.data.checkoutUrl);
                     }
                 } catch (err) {
-                    console.error('Lỗi tạo link PayOS:', err);
+                    console.error('Lỗi tạo link online:', err);
                 }
             }
         };
@@ -215,7 +213,7 @@ const CheckoutOnline: React.FC = () => {
                     <>
                         <img 
                             src="https://img.vietqr.io/image/MB-PAYOS-compact2.png" 
-                            alt="PayOS Logo" 
+                            alt="Online Payment Logo" 
                             className="h-8 mx-auto mb-6 opacity-80" 
                         />
                         
